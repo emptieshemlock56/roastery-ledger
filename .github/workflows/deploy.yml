@@ -1,0 +1,61 @@
+# Merge to main  ->  CI  ->  deploy STAGING automatically
+#                ->  wait for approval  ->  back up prod DB  ->  deploy PRODUCTION
+#
+# The approval gate comes from the GitHub "production" environment's
+# "Required reviewers" setting (see README, "One-time GitHub setup").
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  staging:
+    needs: ci
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    steps:
+      - name: Trigger Render deploy of this exact commit
+        run: curl --fail --silent --show-error -X POST "${RENDER_DEPLOY_HOOK}&ref=${GITHUB_SHA}"
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+      - name: Wait until staging is running this commit
+        run: ./scripts/wait-for-version.sh "${{ vars.STAGING_URL }}" "${GITHUB_SHA::7}"
+
+  production:
+    needs: staging
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Back up production database before deploying
+        run: |
+          docker run --rm postgres:16-alpine pg_dump --format=custom --no-owner "$DATABASE_URL" > "prod-before-${GITHUB_SHA::7}.dump"
+          ls -lh *.dump
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prod-backup-${{ github.sha }}
+          path: '*.dump'
+          retention-days: 30
+      - name: Trigger Render deploy of this exact commit
+        run: curl --fail --silent --show-error -X POST "${RENDER_DEPLOY_HOOK}&ref=${GITHUB_SHA}"
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+      - name: Wait until production is running this commit
+        run: ./scripts/wait-for-version.sh "${{ vars.PRODUCTION_URL }}" "${GITHUB_SHA::7}"

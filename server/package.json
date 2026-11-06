@@ -1,0 +1,21 @@
+{
+  "name": "@ledger/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "PGLITE_DIR=${PGLITE_DIR:-./.data/dev-db} node --watch src/index.js",
+    "test": "APP_ENV=test node --test --test-concurrency=1 'test/**/*.test.js'"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.15",
+    "bcryptjs": "^3.0.3",
+    "express": "^5.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.1"
+  }
+}

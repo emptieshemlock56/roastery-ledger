@@ -1,0 +1,27 @@
+# Manually copies production data into staging so you can rehearse a change
+# against real-looking data. Staging data is overwritten; production is only read.
+name: Refresh staging data from production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "overwrite staging" to confirm'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    if: github.event.inputs.confirm == 'overwrite staging'
+    runs-on: ubuntu-latest
+    environment: refresh-staging
+    steps:
+      - name: Copy production -> staging
+        run: |
+          docker run --rm postgres:16-alpine pg_dump --format=custom --no-owner --no-privileges "$PROD_URL" > prod.dump
+          docker run --rm -i postgres:16-alpine pg_restore --clean --if-exists --no-owner --no-privileges -d "$STAGING_URL" < prod.dump
+        env:
+          PROD_URL: ${{ secrets.PROD_DATABASE_URL }}
+          STAGING_URL: ${{ secrets.STAGING_DATABASE_URL }}
