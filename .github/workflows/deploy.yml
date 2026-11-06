@@ -41,17 +41,26 @@ jobs:
       name: production
       url: ${{ vars.PRODUCTION_URL }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Back up production database before deploying
+      - uses: actions/checkout@v5
+      # The repo is public, so artifacts are downloadable by anyone. The dump is
+      # encrypted with BACKUP_PASSPHRASE before upload and the plain file never
+      # leaves the runner. See README "Restoring a backup".
+      - name: Back up production database before deploying (encrypted)
         run: |
-          docker run --rm postgres:16-alpine pg_dump --format=custom --no-owner "$DATABASE_URL" > "prod-before-${GITHUB_SHA::7}.dump"
-          ls -lh *.dump
+          if [ -z "$BACKUP_PASSPHRASE" ]; then echo "BACKUP_PASSPHRASE secret is not set" >&2; exit 1; fi
+          docker run --rm postgres:16-alpine pg_dump --format=custom --no-owner "$DATABASE_URL" > prod.dump
+          gpg --batch --yes --symmetric --cipher-algo AES256 --pinentry-mode loopback \
+              --passphrase-fd 3 --output "prod-before-${GITHUB_SHA::7}.dump.gpg" prod.dump 3<<<"$BACKUP_PASSPHRASE"
+          shred -u prod.dump
+          ls -lh *.gpg
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      - uses: actions/upload-artifact@v4
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      - uses: actions/upload-artifact@v5
         with:
           name: prod-backup-${{ github.sha }}
-          path: '*.dump'
+          path: '*.dump.gpg'
+          if-no-files-found: error
           retention-days: 30
       - name: Trigger Render deploy of this exact commit
         run: curl --fail --silent --show-error -X POST "${RENDER_DEPLOY_HOOK}&ref=${GITHUB_SHA}"

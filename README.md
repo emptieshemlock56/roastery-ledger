@@ -82,7 +82,10 @@ or production; add another one instead.
 
 ## One-time setup (hosting + GitHub)
 
-1. **GitHub repo**: create a *private* repo and push this folder.
+1. **GitHub repo**: [emptieshemlock56/roastery-ledger](https://github.com/emptieshemlock56/roastery-ledger).
+   It is **public** so GitHub Free enforces branch protection and the production approval gate.
+   Only the code is public. Inventory data lives in the Render databases, and every password, key
+   and database URL is a GitHub or Render secret. **Never commit secrets or real data files.**
 2. **Render**: New → Blueprint → pick the repo. `render.yaml` creates `ledger-staging`,
    `ledger-prod` and a database for each. When asked, set `ADMIN_EMAIL` / `ADMIN_PASSWORD` for each
    service. That becomes the first admin account (change the password after first sign-in).
@@ -92,7 +95,8 @@ or production; add another one instead.
    - `staging`: secret `RENDER_DEPLOY_HOOK` (staging hook), variable `STAGING_URL`
      (for example `https://ledger-staging.onrender.com`).
    - `production`: secret `RENDER_DEPLOY_HOOK` (prod hook), secret `DATABASE_URL` (prod database
-     *external* URL from Render, used for the pre-deploy backup), variable `PRODUCTION_URL`.
+     *external* URL from Render, used for the pre-deploy backup), secret `BACKUP_PASSPHRASE` (a long
+     random passphrase, also kept in your password manager), variable `PRODUCTION_URL`.
      **Turn on "Required reviewers"** and add yourself or a trusted person. This is the approval gate.
    - `refresh-staging` (optional): secrets `PROD_DATABASE_URL`, `STAGING_DATABASE_URL`. Also add
      required reviewers.
@@ -100,8 +104,25 @@ or production; add another one instead.
    `CI / test` check, and block force pushes. Tinkerers then work on branches and open PRs, and
    nothing reaches staging or prod without passing tests and review.
 
-Prod backups taken before each deploy are kept as workflow artifacts for 30 days. That's another
-reason the repo must be private. Render also takes daily database backups on paid plans.
+### Restoring a backup
+
+Before each production deploy, the workflow dumps the prod database, **encrypts it with
+`BACKUP_PASSPHRASE`**, and keeps it as a workflow artifact for 30 days. Artifacts in a public repo can
+be downloaded by anyone, which is why only the encrypted file is uploaded. To restore one, download it
+from the Actions run, then:
+
+```bash
+gpg --decrypt prod-before-abc1234.dump.gpg > prod.dump
+```
+
+```bash
+pg_restore --clean --if-exists --no-owner -d "<prod external database URL>" prod.dump
+```
+
+Render also takes daily database backups on paid plans.
+
+Workflow logs are public too, so the workflows never print data or secrets (GitHub masks secrets
+automatically).
 
 **Deploying a specific commit:** the workflow calls the Render deploy hook with `&ref=<commit>` so
 prod gets exactly the commit that was tested on staging. Check this against Render's current deploy
