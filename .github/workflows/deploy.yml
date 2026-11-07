@@ -49,7 +49,13 @@ jobs:
       - name: Back up production database before deploying (encrypted)
         run: |
           if [ -z "$BACKUP_PASSPHRASE" ]; then echo "BACKUP_PASSPHRASE secret is not set" >&2; exit 1; fi
-          docker run --rm postgres:17-alpine pg_dump --format=custom --no-owner "$DATABASE_URL" > prod.dump
+          # Fail with a clear message (and without echoing the value into the public log)
+          # if the secret holds something other than a Postgres connection string.
+          case "$DATABASE_URL" in
+            postgres://*|postgresql://*) ;;
+            *) echo "DATABASE_URL secret is not a postgresql:// connection string" >&2; exit 1 ;;
+          esac
+          docker run --rm postgres:18-alpine pg_dump --format=custom --no-owner "$DATABASE_URL" > prod.dump
           gpg --batch --yes --symmetric --cipher-algo AES256 --pinentry-mode loopback \
               --passphrase-fd 3 --output "prod-before-${GITHUB_SHA::7}.dump.gpg" prod.dump 3<<<"$BACKUP_PASSPHRASE"
           shred -u prod.dump
