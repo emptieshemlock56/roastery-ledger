@@ -1,25 +1,19 @@
-# Render Blueprint: two fully separate environments, each with its own web
-# service and its own database. Nothing is shared between staging and production.
+# Render Blueprint: two separate environments (staging, production), each its own
+# free web service. Databases live on Neon (free, permanent), one per environment;
+# paste each connection string as DATABASE_URL when Render asks.
+#
+# Free web services sleep after 15 minutes without visitors and take about a
+# minute to wake. To remove that, change `plan: free` to a paid plan, or move to
+# self-hosting with the Dockerfile (see README "Hosting").
 #
 # autoDeploy is OFF on purpose: deploys only happen through GitHub Actions
 # (.github/workflows/deploy.yml), after tests pass, and prod only after approval.
-# Plan names/prices: check https://render.com/pricing when you create these.
-
-databases:
-  - name: ledger-staging-db
-    databaseName: ledger
-    plan: basic-256mb
-    postgresMajorVersion: "16"
-  - name: ledger-prod-db
-    databaseName: ledger
-    plan: basic-256mb
-    postgresMajorVersion: "16"
 
 services:
   - type: web
     name: ledger-staging
     runtime: node
-    plan: starter
+    plan: free
     branch: main
     autoDeploy: false
     buildCommand: npm ci && npm run build
@@ -32,10 +26,10 @@ services:
         value: "24"
       - key: JWT_SECRET
         generateValue: true
+      - key: DATABASE_SSL
+        value: "true"
       - key: DATABASE_URL
-        fromDatabase:
-          name: ledger-staging-db
-          property: connectionString
+        sync: false
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD
@@ -44,7 +38,7 @@ services:
   - type: web
     name: ledger-prod
     runtime: node
-    plan: starter
+    plan: free
     branch: main
     autoDeploy: false
     buildCommand: npm ci && npm run build
@@ -57,10 +51,10 @@ services:
         value: "24"
       - key: JWT_SECRET
         generateValue: true
+      - key: DATABASE_SSL
+        value: "true"
       - key: DATABASE_URL
-        fromDatabase:
-          name: ledger-prod-db
-          property: connectionString
+        sync: false
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD

@@ -2,7 +2,7 @@
 # Most development does not need this; `npm run dev` is enough.
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: ledger
       POSTGRES_PASSWORD: ledger
