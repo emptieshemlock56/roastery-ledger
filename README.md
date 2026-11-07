@@ -88,7 +88,7 @@ minutes without visitors, so the first visit after a quiet spell takes about a m
 databases are permanent (1 GB each).
 
 **Later (self-hosted, e.g. AWS or an on-prem server):** the `Dockerfile` builds one container that
-serves the whole app. Any machine that runs Docker can run it next to a Postgres 17 database. It needs
+serves the whole app. Any machine that runs Docker can run it next to a Postgres 18 database. It needs
 the same environment variables as `render.yaml`: `APP_ENV`, `DATABASE_URL`, `DATABASE_SSL`,
 `JWT_SECRET`, plus `ADMIN_EMAIL`/`ADMIN_PASSWORD` for the first sign-in. Only the "trigger deploy" steps
 in `.github/workflows/deploy.yml` are Render-specific. Moving means swapping those for the new host's
@@ -101,7 +101,7 @@ stay as they are.
    It is **public** so GitHub Free enforces branch protection and the production approval gate.
    Only the code is public. Inventory data lives in the databases, and every password, key and
    database URL is a GitHub or Render secret. **Never commit secrets or real data files.**
-2. **Neon**: create two projects, `ledger-staging` and `ledger-prod` (Postgres 17), and copy each
+2. **Neon**: create two projects, `ledger-staging` and `ledger-prod` (Postgres 18), and copy each
    project's **direct** (not pooled) connection string.
 3. **Render**: New → Blueprint → public repo URL. `render.yaml` creates `ledger-staging` and
    `ledger-prod` on the free plan. When asked, paste each environment's Neon connection string as
