@@ -80,28 +80,45 @@ Add a new file in `server/migrations/` (`002_add_something.sql`, …). Migration
 when the server starts in every environment. **Never edit a migration that has already run** in staging
 or production; add another one instead.
 
-## One-time setup (hosting + GitHub)
+## Hosting
+
+**Now (prototype, $0/month):** each environment runs on a free [Render](https://render.com) web
+service with a free [Neon](https://neon.tech) Postgres database. Free Render services sleep after 15
+minutes without visitors, so the first visit after a quiet spell takes about a minute. Neon's free
+databases are permanent (1 GB each).
+
+**Later (self-hosted, e.g. AWS or an on-prem server):** the `Dockerfile` builds one container that
+serves the whole app. Any machine that runs Docker can run it next to a Postgres 17 database. It needs
+the same environment variables as `render.yaml`: `APP_ENV`, `DATABASE_URL`, `DATABASE_SSL`,
+`JWT_SECRET`, plus `ADMIN_EMAIL`/`ADMIN_PASSWORD` for the first sign-in. Only the "trigger deploy" steps
+in `.github/workflows/deploy.yml` are Render-specific. Moving means swapping those for the new host's
+deploy command and restoring a backup into the new database. The tests, approval gate and backups
+stay as they are.
+
+## One-time setup (prototype hosting + GitHub)
 
 1. **GitHub repo**: [emptieshemlock56/roastery-ledger](https://github.com/emptieshemlock56/roastery-ledger).
    It is **public** so GitHub Free enforces branch protection and the production approval gate.
-   Only the code is public. Inventory data lives in the Render databases, and every password, key
-   and database URL is a GitHub or Render secret. **Never commit secrets or real data files.**
-2. **Render**: New → Blueprint → pick the repo. `render.yaml` creates `ledger-staging`,
-   `ledger-prod` and a database for each. When asked, set `ADMIN_EMAIL` / `ADMIN_PASSWORD` for each
-   service. That becomes the first admin account (change the password after first sign-in).
-   About $7/month per web service plus about $6–7/month per database at current Render pricing.
-3. **Render deploy hooks**: for each service, Settings → Deploy Hook → copy the URL.
-4. **GitHub environments** (repo Settings → Environments):
+   Only the code is public. Inventory data lives in the databases, and every password, key and
+   database URL is a GitHub or Render secret. **Never commit secrets or real data files.**
+2. **Neon**: create two projects, `ledger-staging` and `ledger-prod` (Postgres 17), and copy each
+   project's **direct** (not pooled) connection string.
+3. **Render**: New → Blueprint → public repo URL. `render.yaml` creates `ledger-staging` and
+   `ledger-prod` on the free plan. When asked, paste each environment's Neon connection string as
+   `DATABASE_URL`, and set `ADMIN_EMAIL` / `ADMIN_PASSWORD`. That becomes the first admin account
+   (change the password after first sign-in).
+4. **Render deploy hooks**: for each service, Settings → Deploy Hook → copy the URL.
+5. **GitHub environments** (repo Settings → Environments):
    - `staging`: secret `RENDER_DEPLOY_HOOK` (staging hook), variable `STAGING_URL`
      (for example `https://ledger-staging.onrender.com`).
-   - `production`: secret `RENDER_DEPLOY_HOOK` (prod hook), secret `DATABASE_URL` (prod database
-     *external* URL from Render, used for the pre-deploy backup), secret `BACKUP_PASSPHRASE` (a long
-     random passphrase, also kept in your password manager), variable `PRODUCTION_URL`.
-     **Turn on "Required reviewers"** and add yourself or a trusted person. This is the approval gate.
+   - `production`: secret `RENDER_DEPLOY_HOOK` (prod hook), secret `DATABASE_URL` (prod Neon
+     connection string, used for the pre-deploy backup), secret `BACKUP_PASSPHRASE` (a long random
+     passphrase, also kept in your password manager), variable `PRODUCTION_URL`. "Required
+     reviewers" is on and production only accepts deploys from `main`. That's the approval gate.
    - `refresh-staging` (optional): secrets `PROD_DATABASE_URL`, `STAGING_DATABASE_URL`. Also add
      required reviewers.
-5. **Branch protection** (Settings → Branches → `main`): require a pull request, require the
-   `CI / test` check, and block force pushes. Tinkerers then work on branches and open PRs, and
+6. **Branch protection** on `main` (already set): pull request with 1 approval, the `test` check
+   must pass, branch must be up to date, no force pushes. Tinkerers work on branches and open PRs, and
    nothing reaches staging or prod without passing tests and review.
 
 ### Restoring a backup
@@ -119,7 +136,7 @@ gpg --decrypt prod-before-abc1234.dump.gpg > prod.dump
 pg_restore --clean --if-exists --no-owner -d "<prod external database URL>" prod.dump
 ```
 
-Render also takes daily database backups on paid plans.
+Neon also keeps a short restore history of each database.
 
 Workflow logs are public too, so the workflows never print data or secrets (GitHub masks secrets
 automatically).

@@ -20,8 +20,8 @@ jobs:
     steps:
       - name: Copy production -> staging
         run: |
-          docker run --rm postgres:16-alpine pg_dump --format=custom --no-owner --no-privileges "$PROD_URL" > prod.dump
-          docker run --rm -i postgres:16-alpine pg_restore --clean --if-exists --no-owner --no-privileges -d "$STAGING_URL" < prod.dump
+          docker run --rm postgres:17-alpine pg_dump --format=custom --no-owner --no-privileges "$PROD_URL" > prod.dump
+          docker run --rm -i postgres:17-alpine pg_restore --clean --if-exists --no-owner --no-privileges -d "$STAGING_URL" < prod.dump
         env:
           PROD_URL: ${{ secrets.PROD_DATABASE_URL }}
           STAGING_URL: ${{ secrets.STAGING_DATABASE_URL }}
