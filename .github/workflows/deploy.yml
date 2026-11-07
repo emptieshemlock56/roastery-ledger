@@ -27,6 +27,7 @@ jobs:
       name: staging
       url: ${{ vars.STAGING_URL }}
     steps:
+      - uses: actions/checkout@v5   # for scripts/wait-for-version.sh
       - name: Trigger Render deploy of this exact commit
         run: curl --fail --silent --show-error -X POST "${RENDER_DEPLOY_HOOK}&ref=${GITHUB_SHA}"
         env:
