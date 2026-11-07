@@ -1,0 +1,6 @@
+# Keep every text file with Unix line endings, including on Windows laptops,
+# so shell scripts and diffs behave the same everywhere.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary

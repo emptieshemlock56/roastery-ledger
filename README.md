@@ -145,6 +145,20 @@ automatically).
 prod gets exactly the commit that was tested on staging. Check this against Render's current deploy
 hook docs when you first set it up.
 
+## Helpers who change the app with Claude
+
+Non-technical helpers can improve the app by talking to Claude on their own laptop. They work on
+their own fork with sample data and send changes as pull requests, so nothing reaches staging or
+production without your review and approval.
+
+- `docs/TINKERER-SETUP-WINDOWS.md`: step-by-step checklist for setting up a helper's Windows laptop.
+- `docs/START-HERE.md`: the one-page guide for the helper.
+- `CLAUDE.md`: the rules Claude follows in this project (plain language, small changes, never touch
+  the pipeline, secrets or old migrations).
+- `.claude/settings.json` pre-approves routine commands for everyone. `.claude/tinkerer-settings.json`
+  is copied to a helper's `.claude/settings.local.json` during setup and blocks the pipeline, secrets,
+  merging and force-pushing.
+
 ## Moving the spreadsheet in
 
 Import → download the template, then save each tab of the current spreadsheet as CSV with those
