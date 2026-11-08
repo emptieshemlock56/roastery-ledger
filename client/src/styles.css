@@ -190,3 +190,21 @@ table.mini th, table.mini td { padding: 5px 6px; border-bottom: 1px solid var(--
 .login { display: grid; place-items: center; min-height: 80vh; }
 .login form { width: 360px; display: flex; flex-direction: column; gap: 14px; }
 .login h1 { font-size: 1.4rem; margin: 0 0 6px; }
+
+/* Two-factor sign-in */
+.setup-card { width: min(560px, 92vw); display: flex; flex-direction: column; gap: 12px; }
+.setup-card h1 { font-size: 1.3rem; margin: 0; }
+.steps { padding-left: 1.2em; display: flex; flex-direction: column; gap: 14px; margin: 0; }
+.steps li { line-height: 1.45; }
+.qr { width: 200px; height: 200px; margin: 10px 0 4px; background: #fff; padding: 6px; border: 1px solid var(--line); border-radius: 8px; }
+.qr svg { width: 100%; height: 100%; display: block; }
+.setup-key { font-size: 0.95rem; letter-spacing: 0.04em; word-break: break-all; }
+.code-input { font-size: 1.3rem; letter-spacing: 0.25em; width: 11ch; margin-top: 6px; display: block; }
+.backup-codes { columns: 2; font-size: 1.05rem; margin: 0; padding-left: 1.8em; }
+.backup-codes li { margin: 4px 0; }
+.pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; background: #eee; color: #555; margin-right: 6px; }
+.pill.ok { background: #e3f1e4; color: #2f6b33; }
+.pill.warn { background: #fff0d6; color: #8a5a00; }
+@media print {
+  .topbar, .foot, .env-banner, button { display: none !important; }
+}

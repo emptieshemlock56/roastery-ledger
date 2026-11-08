@@ -145,6 +145,30 @@ automatically).
 prod gets exactly the commit that was tested on staging. Check this against Render's current deploy
 hook docs when you first set it up.
 
+## Sign-in and two-factor
+
+- **Two-factor sign-in is required in staging and production.** After entering their password, people
+  enter a 6-digit code from an authenticator app (Google/Microsoft Authenticator, 1Password, Apple
+  Passwords). Anyone without it set up is walked through setup at their next sign-in, and gets 10
+  single-use **backup codes** for a lost phone. Local dev doesn't require it (set `REQUIRE_2FA=true`
+  to try it locally). `REQUIRE_2FA=false` turns the requirement off in an environment.
+- **Lost phone and backup codes:** an admin clicks **Reset 2FA** on the Users page. The person is
+  signed out and sets it up again at their next sign-in. Admins can't reset their own, so **keep at
+  least two admins**.
+- **Only admin locked out?** Fix it directly in the database (Neon → the project → SQL Editor),
+  replacing the email:
+  ```sql
+  DELETE FROM backup_codes WHERE user_id = (SELECT id FROM users WHERE email = 'you@example.com');
+  UPDATE users SET totp_secret = NULL, totp_pending_secret = NULL, totp_enabled_at = NULL,
+         totp_last_step = NULL, session_version = session_version + 1
+   WHERE email = 'you@example.com';
+  ```
+- **Sessions** last 7 days. Changing a password, an admin password reset, a 2FA reset, or **Sign out
+  everywhere else** (Account page) ends that person's other sessions. Deactivated users are blocked
+  immediately.
+- Repeated failed passwords or codes are blocked for 15 minutes. Every sign-in (and whether a backup
+  code was used) is in the audit log.
+
 ## Helpers who change the app with Claude
 
 Non-technical helpers can improve the app by talking to Claude on their own laptop. They work on
