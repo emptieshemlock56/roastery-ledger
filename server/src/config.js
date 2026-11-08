@@ -20,8 +20,10 @@ export function loadConfig(env = process.env) {
     version: (env.RENDER_GIT_COMMIT || env.GIT_SHA || 'local').slice(0, 7),
     databaseUrl: env.DATABASE_URL || null,
     databaseSsl: env.DATABASE_SSL === 'true',
-    // Local dev keeps its embedded database here. Unset = in-memory (tests).
-    pgliteDir: env.PGLITE_DIR ?? null,
+    // Local dev keeps its embedded database in server/.data/dev-db (relative to the
+    // server folder, where `npm run dev` runs). Tests pass their own config and use
+    // an in-memory database. Set here rather than in package.json so it works on Windows.
+    pgliteDir: env.PGLITE_DIR ?? (appEnv === 'dev' && !env.DATABASE_URL ? './.data/dev-db' : null),
     adminEmail: env.ADMIN_EMAIL || null,
     adminPassword: env.ADMIN_PASSWORD || null,
   };

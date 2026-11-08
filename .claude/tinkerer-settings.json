@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push -u origin *)",
+      "Bash(git push origin *)",
+      "Bash(gh pr create *)",
+      "Bash(git merge upstream/main)"
+    ],
+    "deny": [
+      "Edit(/.github/**)",
+      "Edit(/render.yaml)",
+      "Edit(/Dockerfile)",
+      "Edit(/docker-compose.yml)",
+      "Edit(/scripts/**)",
+      "Edit(/.claude/**)",
+      "Edit(/CLAUDE.md)",
+      "Edit(/.gitattributes)",
+      "Edit(/server/migrations/001_init.sql)",
+      "Bash(git push upstream *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push --force-with-lease *)",
+      "Bash(git reset --hard *)",
+      "Bash(gh secret *)",
+      "Bash(gh variable *)",
+      "Bash(gh workflow *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh pr review *)",
+      "Bash(gh repo delete *)",
+      "Bash(gh repo edit *)",
+      "PowerShell(git push upstream *)",
+      "PowerShell(git push --force *)",
+      "PowerShell(git push -f *)",
+      "PowerShell(gh secret *)",
+      "PowerShell(gh variable *)",
+      "PowerShell(gh workflow *)",
+      "PowerShell(gh pr merge *)",
+      "PowerShell(gh pr review *)",
+      "PowerShell(gh repo delete *)"
+    ]
+  }
+}

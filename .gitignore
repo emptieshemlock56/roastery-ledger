@@ -4,4 +4,7 @@ server/.data/
 .env
 *.dump
 .DS_Store
-.claude/
+# Claude Code: share the team settings, keep personal ones local
+.claude/*
+!.claude/settings.json
+!.claude/tinkerer-settings.json
