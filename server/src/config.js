@@ -17,6 +17,11 @@ export function loadConfig(env = process.env) {
     jwtSecret: env.JWT_SECRET || 'dev-only-secret-do-not-use-elsewhere',
     secureCookies: deployed,
     bcryptRounds: appEnv === 'test' ? 4 : 12,
+    // Two-factor sign-in is required for everyone in staging and production, optional
+    // in dev (so local sandboxes stay simple). REQUIRE_2FA=true/false overrides.
+    require2fa: env.REQUIRE_2FA ? env.REQUIRE_2FA === 'true' : deployed,
+    // Shown in authenticator apps, so staging and production codes can't be confused.
+    totpIssuer: appEnv === 'production' ? 'Roastery Ledger' : `Roastery Ledger (${appEnv})`,
     version: (env.RENDER_GIT_COMMIT || env.GIT_SHA || 'local').slice(0, 7),
     databaseUrl: env.DATABASE_URL || null,
     databaseSsl: env.DATABASE_SSL === 'true',

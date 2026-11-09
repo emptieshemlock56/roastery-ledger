@@ -9,6 +9,7 @@ import Login from './pages/Login.jsx';
 import Record from './pages/Record.jsx';
 import Reports from './pages/Reports.jsx';
 import Stock from './pages/Stock.jsx';
+import TwoFactorSetup from './pages/TwoFactorSetup.jsx';
 import Users from './pages/Users.jsx';
 
 const PAGES = {
@@ -56,7 +57,7 @@ export default function App() {
 
   // Live updates from other users.
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.must_setup_2fa) return;
     const es = new EventSource('/api/events');
     es.onmessage = (e) => {
       setTick((t) => t + 1);
@@ -72,7 +73,7 @@ export default function App() {
 
   useEffect(() => {
     if (!lastChange) return;
-    const t = setTimeout(() => setLastChange(null), 4000);
+    const t = setTimeout(() => setLastChange(null), lastChange.includes('backup code') ? 12000 : 4000);
     return () => clearTimeout(t);
   }, [lastChange]);
 
@@ -83,21 +84,48 @@ export default function App() {
     </div>
   );
 
-  if (user === undefined) return <div className="loading">Loading…</div>;
-  if (!user) return (
-    <>
-      {banner}
-      <Login onSignedIn={setUser} />
-    </>
-  );
-
-  const allowed = PAGES[page] && (PAGES[page][2] !== 'admin' || user.role === 'admin');
-  const Page = (allowed ? PAGES[page] : PAGES.stock)[1];
+  function signedIn(u, { backupCodesLeft } = {}) {
+    setUser(u);
+    if (backupCodesLeft !== undefined && backupCodesLeft <= 3) {
+      setLastChange(`You have ${backupCodesLeft} backup code${backupCodesLeft === 1 ? '' : 's'} left. Get new ones under Account.`);
+    }
+  }
 
   async function signOut() {
     await api('/auth/logout', { method: 'POST', body: {} }).catch(() => {});
     setUser(null);
   }
+
+  if (user === undefined) return <div className="loading">Loading…</div>;
+  if (!user) return (
+    <>
+      {banner}
+      <Login onSignedIn={signedIn} />
+    </>
+  );
+
+  // Where two-factor sign-in is required, nothing else is available until it's set up.
+  if (user.must_setup_2fa) return (
+    <>
+      {banner}
+      <div className="login">
+        <div className="card setup-card">
+          <h1>☕ Set up two-factor sign-in</h1>
+          <p>
+            To keep the inventory safe, signing in needs your password <b>and</b> a code from your phone. This takes about two minutes and
+            you only do it once.
+          </p>
+          <TwoFactorSetup onEnabled={setUser} />
+          <button className="link small" onClick={signOut}>
+            Sign out
+          </button>
+        </div>
+      </div>
+    </>
+  );
+
+  const allowed = PAGES[page] && (PAGES[page][2] !== 'admin' || user.role === 'admin');
+  const Page = (allowed ? PAGES[page] : PAGES.stock)[1];
 
   return (
     <UserContext.Provider value={user}>

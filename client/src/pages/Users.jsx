@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { api } from '../api.js';
-import { fmtDateTime, Grid, Notice, useData } from '../lib.jsx';
+import { fmtDateTime, Grid, Notice, useData, useUser } from '../lib.jsx';
 
 export default function Users() {
+  const me = useUser();
   const users = useData('/users');
   const audit = useData('/audit');
   const [draft, setDraft] = useState({ name: '', email: '', password: '', role: 'member' });
@@ -30,6 +31,17 @@ export default function Users() {
     users.reload();
   }
 
+  async function reset2fa(u) {
+    if (!window.confirm(`Reset two-factor sign-in for ${u.email}?\n\nUse this if they lost their phone and their backup codes. They'll be signed out and will set it up again next time they sign in.`)) return;
+    try {
+      await api(`/users/${u.id}/reset-2fa`, { method: 'POST', body: {} });
+      setNotice({ kind: 'success', text: `Two-factor sign-in reset for ${u.email}. They'll set it up again at their next sign-in.` });
+    } catch (err) {
+      setNotice({ kind: 'error', text: err.message });
+    }
+    users.reload();
+  }
+
   const userCols = useMemo(
     () => [
       { field: 'name', flex: 1, editable: true },
@@ -37,20 +49,33 @@ export default function Users() {
       { field: 'role', width: 120, editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['member', 'admin'] } },
       { field: 'active', width: 100, editable: true, cellDataType: 'boolean' },
       {
+        field: 'two_factor',
+        headerName: '2FA',
+        width: 110,
+        cellRenderer: (p) => (p.value ? <span className="pill ok">On</span> : <span className="pill warn">Not set up</span>),
+      },
+      {
         headerName: '',
-        width: 150,
+        width: 240,
         sortable: false,
         filter: false,
         cellRenderer: (p) => (
-          <button
-            className="link small"
-            onClick={() => {
-              const pw = window.prompt(`New password for ${p.data.email} (10+ characters)`);
-              if (pw) update(p.data.id, { password: pw });
-            }}
-          >
-            Reset password
-          </button>
+          <>
+            <button
+              className="link small"
+              onClick={() => {
+                const pw = window.prompt(`New password for ${p.data.email} (10+ characters). This signs them out everywhere.`);
+                if (pw) update(p.data.id, { password: pw });
+              }}
+            >
+              Reset password
+            </button>
+            {p.data.two_factor && p.data.id !== me.id && (
+              <button className="link small" style={{ marginLeft: 12 }} onClick={() => reset2fa(p.data)}>
+                Reset 2FA
+              </button>
+            )}
+          </>
         ),
       },
     ],

@@ -2,7 +2,7 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { authRouter, requireAppHeader, requireAuth } from './auth.js';
+import { authRouter, requireAppHeader, requireAuth, requireTwoFactorReady } from './auth.js';
 import { createEventHub } from './events.js';
 import { errorHandler } from './http.js';
 import importRouter from './routes/import.js';
@@ -40,6 +40,7 @@ export function createApp({ db, config }) {
   app.use('/api/auth', authRouter(ctx));
 
   app.use('/api', requireAuth(ctx));
+  app.use('/api', requireTwoFactorReady(config));
   app.get('/api/events', events.handler);
   app.use('/api/items', itemsRouter(ctx));
   app.use('/api/machines', machinesRouter(ctx));
