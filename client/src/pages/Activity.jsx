@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
-import { fmtDateTime, fmtQty, Grid, KIND_LABELS, linesSummary, Notice, toDateInput, useData } from '../lib.jsx';
+import { fmtDateTime, fmtQty, Grid, KIND_LABELS, linesSummary, Notice, toDateInput, useData, useDialog } from '../lib.jsx';
 
 export default function Activity() {
   const grid = useRef();
@@ -10,6 +10,7 @@ export default function Activity() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [dialog, ask] = useDialog();
 
   const toExclusive = new Date(new Date(`${to}T00:00`).getTime() + 86400000).toISOString();
   const params = new URLSearchParams({ from: new Date(`${from}T00:00`).toISOString(), to: toExclusive, limit: '2000' });
@@ -36,7 +37,13 @@ export default function Activity() {
   );
 
   async function voidEntry() {
-    const reason = window.prompt('Why is this entry being voided? (kept in the history)');
+    const reason = await ask({
+      title: 'Void this entry?',
+      message: 'It stays in the history, crossed out, and stops counting toward stock.',
+      input: { label: 'Why is it being voided?', placeholder: 'e.g. entered twice' },
+      confirmLabel: 'Void entry',
+      danger: true,
+    });
     if (!reason) return;
     try {
       const updated = await api(`/movements/${selected.id}/void`, { method: 'POST', body: { reason } });
@@ -49,6 +56,7 @@ export default function Activity() {
 
   return (
     <div className="split">
+      {dialog}
       <section className="grow">
         <div className="toolbar">
           <h2>Activity</h2>

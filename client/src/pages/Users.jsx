@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { api } from '../api.js';
-import { fmtDateTime, Grid, Notice, useData, useUser } from '../lib.jsx';
+import { fmtDateTime, Grid, Notice, useData, useDialog, useUser } from '../lib.jsx';
 
 export default function Users() {
   const me = useUser();
+  const [dialog, ask] = useDialog();
   const users = useData('/users');
   const help = useData('/users/help-requests');
   const audit = useData('/audit');
@@ -33,8 +34,13 @@ export default function Users() {
     help.reload();
   }
 
-  function resetPassword(u) {
-    const pw = window.prompt(`New temporary password for ${u.email} (10+ characters). This signs them out everywhere.`);
+  async function resetPassword(u) {
+    const pw = await ask({
+      title: `Reset password for ${u.email}?`,
+      message: 'Type a temporary password and give it to them in person or by phone. This signs them out everywhere; they can change it under Account.',
+      input: { label: 'Temporary password', minLength: 10, placeholder: '10+ characters' },
+      confirmLabel: 'Reset password',
+    });
     if (pw) update(u.id, { password: pw });
   }
 
@@ -48,7 +54,13 @@ export default function Users() {
   }
 
   async function reset2fa(u) {
-    if (!window.confirm(`Reset two-factor sign-in for ${u.email}?\n\nUse this if they lost their phone and their backup codes. They'll be signed out and will set it up again next time they sign in.`)) return;
+    const ok = await ask({
+      title: `Reset two-factor sign-in for ${u.email}?`,
+      message: "Use this if they lost their phone and their backup codes. Confirm it's really them first.\n\nThey'll be signed out and will set it up again next time they sign in.",
+      confirmLabel: 'Reset 2FA',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api(`/users/${u.id}/reset-2fa`, { method: 'POST', body: {} });
       setNotice({ kind: 'success', text: `Two-factor sign-in reset for ${u.email}. They'll set it up again at their next sign-in.` });
@@ -107,6 +119,7 @@ export default function Users() {
 
   return (
     <section>
+      {dialog}
       <h2>Users</h2>
       <p className="muted small">
         Admins can manage users. Everyone else can record and edit inventory data. Nobody can change how the app works from here: that

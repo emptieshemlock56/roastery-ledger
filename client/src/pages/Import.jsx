@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Papa from 'papaparse';
 import { api } from '../api.js';
-import { Notice, useUser } from '../lib.jsx';
+import { Notice, useDialog, useUser } from '../lib.jsx';
 
 const TEMPLATE = `code,name,type,unit,on_hand,reorder_point,pack_size_oz,units_per_case,supplier,sage_item_code,notes
 GRN-BRA-CER,Brazil Cerrado Natural (green),green,lb,2640,1000,,,Importer A,,
@@ -138,6 +138,7 @@ function SampleData() {
   const [state, setState] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [dialog, ask] = useDialog();
   const refresh = () => api('/sample-data').then(setState, () => setState(null));
   useEffect(() => {
     if (user.role === 'admin') refresh();
@@ -146,7 +147,7 @@ function SampleData() {
   if (user.role !== 'admin' || !state?.allowed) return null;
 
   async function run(method, confirmText, done) {
-    if (!window.confirm(confirmText)) return;
+    if (!(await ask({ title: method === 'POST' ? 'Load sample data?' : 'Remove sample data?', message: confirmText, confirmLabel: method === 'POST' ? 'Load' : 'Remove', danger: method !== 'POST' }))) return;
     setBusy(true);
     setMsg(null);
     try {
@@ -162,6 +163,7 @@ function SampleData() {
 
   return (
     <div className="card stack sample-card">
+      {dialog}
       <h3>Practice data</h3>
       <p className="small">
         Fill this practice copy with about two months of made-up roastery activity: green coffee deliveries, roasting, blends, packing on

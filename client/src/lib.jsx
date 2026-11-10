@@ -1,4 +1,4 @@
-import { createContext, forwardRef, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, forwardRef, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { AllCommunityModule, ModuleRegistry, themeQuartz } from 'ag-grid-community';
 import { api } from './api.js';
@@ -149,6 +149,78 @@ export function Tabs({ value, onChange, options }) {
           {label}
         </button>
       ))}
+    </div>
+  );
+}
+
+// In-page replacement for window.confirm / window.prompt, which some embedded
+// browsers block (they silently answer "cancel"). Usage:
+//   const [dialog, ask] = useDialog();
+//   const ok = await ask({ title, message, confirmLabel });            // true / false
+//   const text = await ask({ title, input: { label, type, minLength } }); // string / null
+//   ...render {dialog} somewhere in the component.
+export function useDialog() {
+  const [state, setState] = useState(null);
+  const ask = useCallback((opts) => new Promise((resolve) => setState({ ...opts, resolve })), []);
+  const close = (value) => {
+    state?.resolve(value);
+    setState(null);
+  };
+  const dialog = state ? <Dialog {...state} onClose={close} /> : null;
+  return [dialog, ask];
+}
+
+function Dialog({ title, message, input, confirmLabel = 'Confirm', danger, onClose }) {
+  const [value, setValue] = useState('');
+  const ref = useRef(null);
+  useEffect(() => {
+    ref.current?.focus();
+    const onKey = (e) => e.key === 'Escape' && onClose(input ? null : false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [input, onClose]);
+  const tooShort = input?.minLength && value.length < input.minLength;
+
+  return (
+    <div className="dialog-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose(input ? null : false)}>
+      <form
+        className="dialog card stack"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (input && (!value.trim() || tooShort)) return;
+          onClose(input ? value : true);
+        }}
+      >
+        <h3>{title}</h3>
+        {message && <div className="dialog-message">{message}</div>}
+        {input && (
+          <label>
+            {input.label}
+            <input
+              ref={ref}
+              type={input.type ?? 'text'}
+              autoComplete={input.type === 'password' ? 'new-password' : 'off'}
+              placeholder={input.placeholder}
+              minLength={input.minLength}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              required
+            />
+            {tooShort && value.length > 0 && <span className="small muted">At least {input.minLength} characters</span>}
+          </label>
+        )}
+        <div className="row end">
+          <button type="button" onClick={() => onClose(input ? null : false)}>
+            Cancel
+          </button>
+          <button ref={input ? undefined : ref} className={danger ? 'primary danger' : 'primary'} disabled={Boolean(input && (!value.trim() || tooShort))}>
+            {confirmLabel}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
