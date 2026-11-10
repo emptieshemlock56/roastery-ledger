@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { authRouter, requireAppHeader, requireAuth, requireTwoFactorReady } from './auth.js';
 import { createEventHub } from './events.js';
 import { errorHandler } from './http.js';
+import { createMailer } from './mailer.js';
+import { helpRequestRouter } from './routes/help.js';
 import importRouter from './routes/import.js';
 import itemsRouter from './routes/items.js';
 import machinesRouter from './routes/machines.js';
@@ -15,10 +17,10 @@ import usersRouter, { auditRouter } from './routes/users.js';
 
 const CLIENT_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../client/dist');
 
-export function createApp({ db, config }) {
+export function createApp({ db, config, mailer = createMailer(config) }) {
   const app = express();
   const events = createEventHub();
-  const ctx = { db, config, events };
+  const ctx = { db, config, events, mailer };
 
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
@@ -37,6 +39,7 @@ export function createApp({ db, config }) {
 
   app.use('/api', requireAppHeader);
   app.get('/api/config', (_req, res) => res.json({ env: config.appEnv, version: config.version }));
+  app.use('/api/auth/help', helpRequestRouter(ctx));
   app.use('/api/auth', authRouter(ctx));
 
   app.use('/api', requireAuth(ctx));

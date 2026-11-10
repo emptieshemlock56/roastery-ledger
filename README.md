@@ -165,6 +165,18 @@ hook docs when you first set it up.
          totp_last_step = NULL, session_version = session_version + 1
    WHERE email = 'you@example.com';
   ```
+- **Forgot password / lost phone:** the sign-in page has a **"Forgot your password or lost your
+  phone?"** link. The person enters their email and what they need. The request appears under
+  **Sign-in help requests** on the Users page, with the reset buttons right there, and is emailed to
+  `HELP_REQUEST_EMAIL`. The form gives the same answer whether or not the email has an account, and
+  it's rate-limited. Always confirm it's really them before resetting.
+- **Email setup (Resend):** create a free account at resend.com, make an API key with **sending
+  access** only, and set these on each Render service (Environment):
+  `RESEND_API_KEY` (the key), `HELP_REQUEST_EMAIL` (who gets requests). Until the drumlog.coffee
+  domain is verified in Resend, emails come from `onboarding@resend.dev` and can only go to the email
+  you signed up to Resend with. After verifying the domain (a few DNS records), also set
+  `MAIL_FROM`, for example `Roastery Ledger <ledger@drumlog.coffee>`. Without `RESEND_API_KEY`,
+  requests still show on the Users page; they just aren't emailed.
 - **Sessions** last 7 days. Changing a password, an admin password reset, a 2FA reset, or **Sign out
   everywhere else** (Account page) ends that person's other sessions. Deactivated users are blocked
   immediately.

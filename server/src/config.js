@@ -29,6 +29,12 @@ export function loadConfig(env = process.env) {
     // server folder, where `npm run dev` runs). Tests pass their own config and use
     // an in-memory database. Set here rather than in package.json so it works on Windows.
     pgliteDir: env.PGLITE_DIR ?? (appEnv === 'dev' && !env.DATABASE_URL ? './.data/dev-db' : null),
+    // Sign-in help requests are emailed here (and always listed on the Users page).
+    helpRequestEmail: env.HELP_REQUEST_EMAIL || null,
+    // This site's address, for links in emails. Render sets RENDER_EXTERNAL_URL itself.
+    publicUrl: env.PUBLIC_URL || env.RENDER_EXTERNAL_URL || null,
+    resendApiKey: env.RESEND_API_KEY || null,
+    mailFrom: env.MAIL_FROM || 'Roastery Ledger <onboarding@resend.dev>',
     adminEmail: env.ADMIN_EMAIL || null,
     adminPassword: env.ADMIN_PASSWORD || null,
   };

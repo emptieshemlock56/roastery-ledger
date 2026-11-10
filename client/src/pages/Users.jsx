@@ -5,6 +5,7 @@ import { fmtDateTime, Grid, Notice, useData, useUser } from '../lib.jsx';
 export default function Users() {
   const me = useUser();
   const users = useData('/users');
+  const help = useData('/users/help-requests');
   const audit = useData('/audit');
   const [draft, setDraft] = useState({ name: '', email: '', password: '', role: 'member' });
   const [notice, setNotice] = useState(null);
@@ -29,6 +30,21 @@ export default function Users() {
       setNotice({ kind: 'error', text: err.message });
     }
     users.reload();
+    help.reload();
+  }
+
+  function resetPassword(u) {
+    const pw = window.prompt(`New temporary password for ${u.email} (10+ characters). This signs them out everywhere.`);
+    if (pw) update(u.id, { password: pw });
+  }
+
+  async function resolve(id) {
+    try {
+      await api(`/users/help-requests/${id}/resolve`, { method: 'POST', body: {} });
+    } catch (err) {
+      setNotice({ kind: 'error', text: err.message });
+    }
+    help.reload();
   }
 
   async function reset2fa(u) {
@@ -40,6 +56,7 @@ export default function Users() {
       setNotice({ kind: 'error', text: err.message });
     }
     users.reload();
+    help.reload();
   }
 
   const userCols = useMemo(
@@ -61,13 +78,7 @@ export default function Users() {
         filter: false,
         cellRenderer: (p) => (
           <>
-            <button
-              className="link small"
-              onClick={() => {
-                const pw = window.prompt(`New password for ${p.data.email} (10+ characters). This signs them out everywhere.`);
-                if (pw) update(p.data.id, { password: pw });
-              }}
-            >
+            <button className="link small" onClick={() => resetPassword(p.data)}>
               Reset password
             </button>
             {p.data.two_factor && p.data.id !== me.id && (
@@ -101,6 +112,13 @@ export default function Users() {
         Admins can manage users. Everyone else can record and edit inventory data. Nobody can change how the app works from here: that
         only happens through a reviewed code change.
       </p>
+      <HelpRequests
+        rows={help.data || []}
+        meId={me.id}
+        onResetPassword={(r) => resetPassword({ id: r.user_id, email: r.email })}
+        onReset2fa={(r) => reset2fa({ id: r.user_id, email: r.email })}
+        onResolve={resolve}
+      />
       <form className="toolbar card tight" onSubmit={add}>
         <b>New user</b>
         <input placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
@@ -132,5 +150,78 @@ export default function Users() {
       <h3>Audit log</h3>
       <Grid rowData={audit.data || []} columnDefs={auditCols} height="360px" />
     </section>
+  );
+}
+
+const KIND_LABELS = { password: 'Password reset', two_factor: 'Two-factor reset' };
+
+function HelpRequests({ rows, meId, onResetPassword, onReset2fa, onResolve }) {
+  const open = rows.filter((r) => !r.resolved_at);
+  const done = rows.filter((r) => r.resolved_at);
+  const [showDone, setShowDone] = useState(false);
+  if (!rows.length) return null;
+
+  const action = (r) => {
+    if (!r.user_id) return <span className="muted small">No account has this email</span>;
+    if (!r.user_active) return <span className="muted small">Account is deactivated</span>;
+    if (r.kind === 'password')
+      return (
+        <button className="link small" onClick={() => onResetPassword(r)}>
+          Reset password
+        </button>
+      );
+    if (r.user_id === meId) return <span className="muted small">Another admin must reset yours</span>;
+    if (!r.user_two_factor) return <span className="muted small">Two-factor isn't set up, nothing to reset</span>;
+    return (
+      <button className="link small" onClick={() => onReset2fa(r)}>
+        Reset 2FA
+      </button>
+    );
+  };
+
+  return (
+    <div className={`card stack help-requests ${open.length ? 'has-open' : ''}`}>
+      <h3>
+        Sign-in help requests {open.length > 0 && <span className="pill warn">{open.length} open</span>}
+      </h3>
+      {open.length > 0 && (
+        <p className="small muted">Confirm it's really them (in person or by phone) before resetting anything. Anyone can fill in the form.</p>
+      )}
+      {open.map((r) => (
+        <div key={r.id} className="help-row">
+          <div>
+            <b>{r.user_name || r.email}</b> <span className="muted small">{r.user_name ? r.email : ''}</span>
+            <div className="small">
+              {KIND_LABELS[r.kind]} · {fmtDateTime(r.created_at)}
+              {r.note && <div className="muted">"{r.note}"</div>}
+            </div>
+          </div>
+          <div className="help-actions">
+            {action(r)}
+            <button className="link small" onClick={() => onResolve(r.id)}>
+              Mark done
+            </button>
+          </div>
+        </div>
+      ))}
+      {open.length === 0 && <p className="small muted">No open requests.</p>}
+      {done.length > 0 && (
+        <button className="link small" onClick={() => setShowDone((v) => !v)}>
+          {showDone ? 'Hide' : 'Show'} handled in the last 14 days ({done.length})
+        </button>
+      )}
+      {showDone &&
+        done.map((r) => (
+          <div key={r.id} className="help-row done small">
+            <span>
+              {r.email} · {KIND_LABELS[r.kind]} · asked {fmtDateTime(r.created_at)}
+            </span>
+            <span className="muted">
+              handled {fmtDateTime(r.resolved_at)}
+              {r.resolved_by_name ? ` by ${r.resolved_by_name}` : ''}
+            </span>
+          </div>
+        ))}
+    </div>
   );
 }
