@@ -8,7 +8,7 @@ export const PASSWORD = 'test-password-123';
 
 // Starts a fresh app + empty database. Uses in-memory PGlite by default;
 // CI also runs the suite against real Postgres via TEST_DATABASE_URL.
-export async function startTestApp(overrides = {}) {
+export async function startTestApp(overrides = {}, { mailer } = {}) {
   const config = { ...loadConfig({ APP_ENV: 'test' }), ...overrides };
   const db = await createDb({ databaseUrl: process.env.TEST_DATABASE_URL || null });
   if (db.engine === 'postgres') await db.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
@@ -22,7 +22,7 @@ export async function startTestApp(overrides = {}) {
     [hash],
   );
 
-  const { app, events } = createApp({ db, config });
+  const { app, events } = createApp({ db, config, ...(mailer ? { mailer } : {}) });
   const server = await new Promise((resolve) => {
     const s = app.listen(0, () => resolve(s));
   });

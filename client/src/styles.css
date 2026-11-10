@@ -208,3 +208,10 @@ table.mini th, table.mini td { padding: 5px 6px; border-bottom: 1px solid var(--
 @media print {
   .topbar, .foot, .env-banner, button { display: none !important; }
 }
+.link.inline-link { padding: 0; display: inline; }
+.help-requests { margin-bottom: 14px; gap: 10px; }
+.help-requests.has-open { border-color: #f0d199; }
+.help-requests h3 { margin: 0; }
+.help-row { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.help-row.done { opacity: 0.75; }
+.help-actions { display: flex; gap: 14px; align-items: center; }

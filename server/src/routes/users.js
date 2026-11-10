@@ -10,6 +10,40 @@ export default function usersRouter({ db, config }) {
   const router = Router();
   router.use(requireAdmin);
 
+  // Doing the reset someone asked for closes their open request of that kind.
+  const resolveHelp = (userId, kind, adminId) =>
+    db.query(
+      'UPDATE help_requests SET resolved_at = NOW(), resolved_by = $3 WHERE user_id = $1 AND kind = $2 AND resolved_at IS NULL',
+      [userId, kind, adminId],
+    );
+
+  // Sign-in help requests: open ones, plus those handled in the last 14 days.
+  router.get('/help-requests', async (_req, res) => {
+    const { rows } = await db.query(
+      `SELECT h.id, h.email, h.kind, h.note, h.created_at, h.resolved_at, h.user_id,
+              u.name AS user_name, u.active AS user_active, (u.totp_enabled_at IS NOT NULL) AS user_two_factor,
+              r.name AS resolved_by_name
+         FROM help_requests h
+         LEFT JOIN users u ON u.id = h.user_id
+         LEFT JOIN users r ON r.id = h.resolved_by
+        WHERE h.resolved_at IS NULL OR h.resolved_at > NOW() - INTERVAL '14 days'
+        ORDER BY (h.resolved_at IS NULL) DESC, h.created_at DESC
+        LIMIT 100`,
+    );
+    res.json(rows);
+  });
+
+  router.post('/help-requests/:id/resolve', async (req, res) => {
+    const id = uuid(req.params.id, 'id');
+    const { rows } = await db.query(
+      'UPDATE help_requests SET resolved_at = NOW(), resolved_by = $2 WHERE id = $1 AND resolved_at IS NULL RETURNING id',
+      [id, req.user.id],
+    );
+    if (!rows[0]) throw new HttpError(404, 'Request not found or already handled');
+    await audit(db, req.user, 'resolve', 'help_request', id);
+    res.json({ ok: true });
+  });
+
   router.get('/', async (_req, res) => {
     const { rows } = await db.query(
       `SELECT ${PUBLIC_COLS}, created_at FROM users ORDER BY active DESC, name`,
@@ -57,6 +91,7 @@ export default function usersRouter({ db, config }) {
     if (!rows[0]) throw new HttpError(404, 'User not found');
     const { password: _pw, ...logged } = b;
     await audit(db, req.user, 'update', 'user', id, { ...logged, password_reset: 'password' in b });
+    if ('password' in b) await resolveHelp(id, 'password', req.user.id);
     res.json(rows[0]);
   });
 
@@ -68,6 +103,7 @@ export default function usersRouter({ db, config }) {
     if (!rows[0]) throw new HttpError(404, 'User not found');
     await resetTwoFactor(db, id);
     await audit(db, req.user, 'reset_2fa', 'user', id, { email: rows[0].email });
+    await resolveHelp(id, 'two_factor', req.user.id);
     res.json({ ok: true });
   });
 
