@@ -2,6 +2,7 @@ import { createApp } from './app.js';
 import { bootstrapAdmin } from './auth.js';
 import { loadConfig } from './config.js';
 import { createDb } from './db.js';
+import { claimEnvironment, WrongDatabaseError } from './envlock.js';
 import { migrate } from './migrate.js';
 import { seedDev } from './seed.js';
 
@@ -11,6 +12,17 @@ console.log(`Database: ${db.engine}${db.engine === 'pglite' ? ` (${config.pglite
 
 const applied = await migrate(db);
 if (applied.length) console.log(`Applied migrations: ${applied.join(', ')}`);
+
+if (config.deployed) {
+  try {
+    console.log(`Database belongs to: ${await claimEnvironment(db, config.appEnv)}`);
+  } catch (err) {
+    if (!(err instanceof WrongDatabaseError)) throw err;
+    console.error(`\n*** ${err.message}\n`);
+    await db.close();
+    process.exit(1);
+  }
+}
 
 await bootstrapAdmin(db, config);
 if (config.appEnv === 'dev' && process.env.SEED !== 'false') await seedDev(db, config);

@@ -8,3 +8,6 @@ server/.data/
 .claude/*
 !.claude/settings.json
 !.claude/tinkerer-settings.json
+
+# Two-factor backup codes downloaded from the app: personal, never commit
+*backup-codes*.txt

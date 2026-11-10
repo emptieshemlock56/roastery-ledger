@@ -47,7 +47,9 @@ feature branch ──PR──▶ CI (tests on embedded + real Postgres, build)
                       main ──▶ deploy STAGING ──▶ ⏸ approval ──▶ back up prod DB ──▶ deploy PRODUCTION
 ```
 
-Each environment has its own database. Staging and dev can't touch production data.
+Each environment has its own database. Staging and dev can't touch production data. Each deployed
+database also records which environment it belongs to: if staging's server is ever pointed at the
+production database (or the reverse), it refuses to start and Render's logs say why.
 The top of the app shows a green **DEV** or orange **STAGING** banner, so nobody mistakes a practice
 copy for the real thing.
 
