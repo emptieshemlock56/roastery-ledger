@@ -12,6 +12,7 @@ import itemsRouter from './routes/items.js';
 import machinesRouter from './routes/machines.js';
 import movementsRouter from './routes/movements.js';
 import reportsRouter from './routes/reports.js';
+import sampleRouter from './routes/sample.js';
 import stockRouter from './routes/stock.js';
 import usersRouter, { auditRouter } from './routes/users.js';
 
@@ -51,6 +52,7 @@ export function createApp({ db, config, mailer = createMailer(config) }) {
   app.use('/api/stock', stockRouter(ctx));
   app.use('/api/reports', reportsRouter(ctx));
   app.use('/api/import', importRouter(ctx));
+  app.use('/api/sample-data', sampleRouter(ctx));
   app.use('/api/users', usersRouter(ctx));
   app.use('/api/audit', auditRouter(ctx));
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));

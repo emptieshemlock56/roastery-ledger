@@ -215,3 +215,4 @@ table.mini th, table.mini td { padding: 5px 6px; border-bottom: 1px solid var(--
 .help-row { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
 .help-row.done { opacity: 0.75; }
 .help-actions { display: flex; gap: 14px; align-items: center; }
+.sample-card { margin-bottom: 18px; border-style: dashed; }
