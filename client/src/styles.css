@@ -216,3 +216,11 @@ table.mini th, table.mini td { padding: 5px 6px; border-bottom: 1px solid var(--
 .help-row.done { opacity: 0.75; }
 .help-actions { display: flex; gap: 14px; align-items: center; }
 .sample-card { margin-bottom: 18px; border-style: dashed; }
+
+/* In-page confirm / prompt dialogs */
+.dialog-backdrop { position: fixed; inset: 0; background: rgba(20, 14, 10, 0.45); display: grid; place-items: center; z-index: 100; padding: 16px; }
+.dialog { width: min(440px, 100%); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25); }
+.dialog h3 { margin: 0; }
+.dialog-message { white-space: pre-line; line-height: 1.45; }
+button.primary.danger { background: #a3352b; border-color: #a3352b; color: #fff; }
+button.primary.danger:hover { background: #87281f; }
