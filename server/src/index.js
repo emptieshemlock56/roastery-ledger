@@ -1,7 +1,7 @@
 import { createApp } from './app.js';
 import { bootstrapAdmin } from './auth.js';
 import { loadConfig } from './config.js';
-import { createDb } from './db.js';
+import { createDb, withDbRetry } from './db.js';
 import { claimEnvironment, WrongDatabaseError } from './envlock.js';
 import { migrate } from './migrate.js';
 import { seedDev } from './seed.js';
@@ -10,7 +10,7 @@ const config = loadConfig();
 const db = await createDb(config);
 console.log(`Database: ${db.engine}${db.engine === 'pglite' ? ` (${config.pgliteDir || 'in-memory'})` : ''}`);
 
-const applied = await migrate(db);
+const applied = await withDbRetry(() => migrate(db));
 if (applied.length) console.log(`Applied migrations: ${applied.join(', ')}`);
 
 if (config.deployed) {
