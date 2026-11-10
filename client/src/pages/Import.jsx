@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Papa from 'papaparse';
 import { api } from '../api.js';
-import { Notice } from '../lib.jsx';
+import { Notice, useUser } from '../lib.jsx';
 
 const TEMPLATE = `code,name,type,unit,on_hand,reorder_point,pack_size_oz,units_per_case,supplier,sage_item_code,notes
 GRN-BRA-CER,Brazil Cerrado Natural (green),green,lb,2640,1000,,,Importer A,,
@@ -57,6 +57,7 @@ export default function Import() {
 
   return (
     <div className="narrow wide">
+      <SampleData />
       <h2>Import from spreadsheet</h2>
       <div className="card stack">
         <p>
@@ -127,6 +128,75 @@ export default function Import() {
           </Notice>
         )}
       </div>
+    </div>
+  );
+}
+
+// Practice copies only (staging and local): load or remove a realistic set of fake data.
+function SampleData() {
+  const user = useUser();
+  const [state, setState] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const refresh = () => api('/sample-data').then(setState, () => setState(null));
+  useEffect(() => {
+    if (user.role === 'admin') refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (user.role !== 'admin' || !state?.allowed) return null;
+
+  async function run(method, confirmText, done) {
+    if (!window.confirm(confirmText)) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await api('/sample-data', { method, body: {} });
+      setMsg({ kind: 'success', text: done(r) });
+    } catch (err) {
+      setMsg({ kind: 'error', text: err.message });
+    } finally {
+      setBusy(false);
+      refresh();
+    }
+  }
+
+  return (
+    <div className="card stack sample-card">
+      <h3>Practice data</h3>
+      <p className="small">
+        Fill this practice copy with about two months of made-up roastery activity: green coffee deliveries, roasting, blends, packing on
+        two packers, shipments, damaged bags and one voided mistake. Sample items have codes starting with <code>DEMO-</code>. This
+        option doesn't exist on the real (production) app.
+      </p>
+      <div className="row">
+        {!state.loaded ? (
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() =>
+              run('POST', 'Load about 300 sample entries and 33 sample items into this practice copy?', (r) =>
+                `Loaded ${r.items} items, ${r.machines} machines and ${r.movements} entries. Have a look at Stock, Activity and Reports.`,
+              )
+            }
+          >
+            {busy ? 'Loading…' : 'Load sample data'}
+          </button>
+        ) : (
+          <button
+            disabled={busy}
+            onClick={() =>
+              run('DELETE', 'Remove all sample data (DEMO- items and their entries)? Your own practice entries stay.', (r) =>
+                `Removed ${r.movements} entries and ${r.items} items${r.items_deactivated ? ` (${r.items_deactivated} kept but hidden because your own entries use them)` : ''}.`,
+              )
+            }
+          >
+            {busy ? 'Removing…' : 'Remove sample data'}
+          </button>
+        )}
+      </div>
+      <Notice kind={msg?.kind} onClose={() => setMsg(null)}>
+        {msg?.text}
+      </Notice>
     </div>
   );
 }
