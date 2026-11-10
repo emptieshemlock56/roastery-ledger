@@ -22,6 +22,9 @@ jobs:
         run: |
           docker run --rm postgres:18-alpine pg_dump --format=custom --no-owner --no-privileges "$PROD_URL" > prod.dump
           docker run --rm -i postgres:18-alpine pg_restore --clean --if-exists --no-owner --no-privileges -d "$STAGING_URL" < prod.dump
+          # The copy carries production's environment marker; hand the database back to staging
+          # (otherwise the staging server refuses to start on it, see server/src/envlock.js).
+          docker run --rm postgres:18-alpine psql "$STAGING_URL" -v ON_ERROR_STOP=1 -c "UPDATE app_environment SET env = 'staging'"
         env:
           PROD_URL: ${{ secrets.PROD_DATABASE_URL }}
           STAGING_URL: ${{ secrets.STAGING_DATABASE_URL }}
