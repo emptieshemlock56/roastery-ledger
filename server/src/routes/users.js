@@ -4,9 +4,28 @@ import { checkPasswordStrength, hashPassword, requireAdmin, resetTwoFactor } fro
 import { bool, HttpError, oneOf, text, uuid } from '../http.js';
 
 const ROLES = ['admin', 'member'];
-const PUBLIC_COLS = 'id, email, name, role, active, (totp_enabled_at IS NOT NULL) AS two_factor';
+const PUBLIC_COLS =
+  'id, email, name, role, role_id, (SELECT name FROM roles WHERE roles.id = users.role_id) AS role_name, active, (totp_enabled_at IS NOT NULL) AS two_factor';
 
-export default function usersRouter({ db, config }) {
+// Turns { role, role_id } from the request into what gets saved, or null when the
+// request doesn't touch access. "admin" can do everything; a "member" gets what their role lists.
+async function accessFrom(db, b) {
+  if (!('role' in b) && !('role_id' in b)) return null;
+  if (b.role === 'admin') return { role: 'admin', role_id: null };
+  if (b.role !== undefined) oneOf(b.role, 'role', ROLES);
+  let roleId = uuid(b.role_id, 'role', { required: false });
+  if (!roleId) {
+    // No role chosen: start people with the safest one (look but don't touch).
+    const { rows } = await db.query("SELECT id FROM roles WHERE name = 'View only'");
+    roleId = rows[0]?.id ?? null;
+  } else {
+    const { rows } = await db.query('SELECT 1 FROM roles WHERE id = $1', [roleId]);
+    if (!rows[0]) throw new HttpError(400, 'That role no longer exists');
+  }
+  return { role: 'member', role_id: roleId };
+}
+
+export default function usersRouter({ db, config, events }) {
   const router = Router();
   router.use(requireAdmin);
 
@@ -56,18 +75,21 @@ export default function usersRouter({ db, config }) {
     const email = text(b.email, 'email', { required: true, max: 200 }).toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, 'Email is not valid');
     const hash = await hashPassword(checkPasswordStrength(b.password), config);
+    const access = await accessFrom(db, 'role' in b || 'role_id' in b ? b : { role: 'member' });
     const { rows } = await db.query(
-      `INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING ${PUBLIC_COLS}`,
-      [email, text(b.name, 'name', { required: true, max: 100 }), hash, oneOf(b.role ?? 'member', 'role', ROLES)],
+      `INSERT INTO users (email, name, password_hash, role, role_id) VALUES ($1, $2, $3, $4, $5) RETURNING ${PUBLIC_COLS}`,
+      [email, text(b.name, 'name', { required: true, max: 100 }), hash, access.role, access.role_id],
     );
-    await audit(db, req.user, 'create', 'user', rows[0].id, { email, role: rows[0].role });
+    await audit(db, req.user, 'create', 'user', rows[0].id, { email, role: rows[0].role_name ?? rows[0].role });
+    events.emit('users', req.user);
     res.status(201).json(rows[0]);
   });
 
   router.patch('/:id', async (req, res) => {
     const id = uuid(req.params.id, 'id');
     const b = req.body ?? {};
-    if (id === req.user.id && (b.active === false || (b.role && b.role !== 'admin'))) {
+    const access = await accessFrom(db, b);
+    if (id === req.user.id && (b.active === false || (access && access.role !== 'admin'))) {
       throw new HttpError(400, "You can't remove your own admin access");
     }
     const sets = [];
@@ -77,7 +99,10 @@ export default function usersRouter({ db, config }) {
       sets.push(`${col} = $${vals.length}`);
     };
     if ('name' in b) add('name', text(b.name, 'name', { required: true, max: 100 }));
-    if ('role' in b) add('role', oneOf(b.role, 'role', ROLES));
+    if (access) {
+      add('role', access.role);
+      add('role_id', access.role_id);
+    }
     if ('active' in b) add('active', bool(b.active, 'active'));
     if ('password' in b) {
       add('password_hash', await hashPassword(checkPasswordStrength(b.password), config));
@@ -90,7 +115,8 @@ export default function usersRouter({ db, config }) {
     );
     if (!rows[0]) throw new HttpError(404, 'User not found');
     const { password: _pw, ...logged } = b;
-    await audit(db, req.user, 'update', 'user', id, { ...logged, password_reset: 'password' in b });
+    await audit(db, req.user, 'update', 'user', id, { ...logged, ...(access ? { role_name: rows[0].role_name ?? 'Administrator' } : {}), password_reset: 'password' in b });
+    events.emit('users', req.user);
     if ('password' in b) await resolveHelp(id, 'password', req.user.id);
     res.json(rows[0]);
   });

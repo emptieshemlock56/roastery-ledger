@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requirePermission } from '../auth.js';
 import { text, uuid } from '../http.js';
 import { recordCount } from '../inventory.js';
 
@@ -38,7 +39,7 @@ export default function stockRouter({ db, events }) {
     res.json(rows);
   });
 
-  router.post('/count', async (req, res) => {
+  router.post('/count', requirePermission('adjust'), async (req, res) => {
     const b = req.body ?? {};
     const result = await db.tx((t) =>
       recordCount(t, req.user, { counts: b.counts, notes: text(b.notes, 'notes', { max: 2000 }) }),

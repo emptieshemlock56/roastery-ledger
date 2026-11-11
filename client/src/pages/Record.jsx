@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
-import { fmtQty, ItemSelect, Notice, Tabs, toLocalInput, useData } from '../lib.jsx';
+import { fmtQty, ItemSelect, Notice, Tabs, toLocalInput, useCan, useData, useUser } from '../lib.jsx';
 
 // What the form asks for on each kind of entry. Mirrors server/src/rules.js.
 const KINDS = {
@@ -56,11 +56,30 @@ const KINDS = {
 
 const emptyLine = () => ({ key: crypto.randomUUID(), item_id: null, qty: '', lot_code: '', sign: -1 });
 
+// Only the kinds of entry this person's role allows are offered. Everyone can still look at Activity.
 export default function Record() {
+  const can = useCan();
+  const user = useUser();
+  const allowed = Object.keys(KINDS).filter((k) => can(k));
+  if (allowed.length === 0) {
+    return (
+      <div className="narrow">
+        <h2>Record</h2>
+        <p className="muted">
+          Your role ({user.role_name}) can look at stock, activity and reports but can't record entries. Ask an admin if you need to.
+        </p>
+      </div>
+    );
+  }
+  // key: start over if an admin changes what this role can do while the page is open
+  return <RecordForm key={allowed.join()} allowedKinds={allowed} />;
+}
+
+function RecordForm({ allowedKinds }) {
   const items = useData('/items');
   const machines = useData('/machines');
   const stock = useData('/stock');
-  const [kind, setKind] = useState('roast');
+  const [kind, setKind] = useState(allowedKinds.includes('roast') ? 'roast' : allowedKinds[0]);
   const cfg = KINDS[kind];
 
   const [when, setWhen] = useState(toLocalInput());
@@ -171,7 +190,9 @@ export default function Record() {
           setKind(k);
           setNotice(null);
         }}
-        options={Object.entries(KINDS).map(([k, v]) => [k, v.label])}
+        options={Object.entries(KINDS)
+          .filter(([k]) => allowedKinds.includes(k))
+          .map(([k, v]) => [k, v.label])}
       />
       <p className="muted">{cfg.help}</p>
       <form className="card stack" onSubmit={submit}>

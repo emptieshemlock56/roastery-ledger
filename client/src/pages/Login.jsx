@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { api } from '../api.js';
+import { Brand } from '../lib.jsx';
 
-export default function Login({ onSignedIn }) {
+export default function Login({ onSignedIn, logo }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [ticket, setTicket] = useState(null); // set after the password step when a code is needed
@@ -52,7 +53,9 @@ export default function Login({ onSignedIn }) {
     <div className="login">
       {!ticket ? (
         <form onSubmit={submitPassword} className="card">
-          <h1>☕ Roastery Ledger</h1>
+          <h1>
+            <Brand logo={logo} />
+          </h1>
           <label>
             Email
             <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
@@ -72,7 +75,9 @@ export default function Login({ onSignedIn }) {
         </form>
       ) : (
         <form onSubmit={submitCode} className="card">
-          <h1>☕ Roastery Ledger</h1>
+          <h1>
+            <Brand logo={logo} />
+          </h1>
           <p>Open your authenticator app and enter the 6-digit code for Roastery Ledger.</p>
           <label>
             Code

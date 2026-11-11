@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { audit } from '../audit.js';
+import { requirePermission } from '../auth.js';
 import { badRequest, number } from '../http.js';
 import { recordCount } from '../inventory.js';
 import { insertItem, parseItemFields, updateItem } from './items.js';
@@ -9,6 +10,7 @@ import { insertItem, parseItemFields, updateItem } from './items.js';
 // This is how the existing shared spreadsheet gets moved in.
 export default function importRouter({ db, events }) {
   const router = Router();
+  router.use(requirePermission('import'));
 
   router.post('/items', async (req, res) => {
     const rows = req.body?.rows;

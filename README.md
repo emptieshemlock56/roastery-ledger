@@ -183,6 +183,19 @@ hook docs when you first set it up.
 - Repeated failed passwords or codes are blocked for 15 minutes. Every sign-in (and whether a backup
   code was used) is in the audit log.
 
+## Roles and the logo
+
+Everyone who signs in can **look** at everything. What a person can **change** depends on their role.
+
+- **Administrator** can do everything, including managing people, roles and the logo. Admins have no role row.
+- Everyone else has a **role** an admin sets up under **Users → Roles**: a grid of ticks for *Receive, Roast, Blend, Pack, Ship, Adjust and stock counts, Void entries, Edit items/recipes/machines, Import*. Anything unticked is read-only for that role. Edits apply immediately, even to people already signed in.
+- Starting roles: *Staff (full access)* (what "member" used to mean), *Roast manager*, *Packing manager*, *Shipping manager*, *View only*. A new user with no role chosen gets *View only*.
+- *Void entries* only works on kinds of entry the person can also record.
+- A role with people in it can't be deleted.
+- The list of permissions lives in `server/src/permissions.js`. To add one, add it there, check it in the route with `assertCan` / `requirePermission` (`server/src/auth.js`), and hide the matching buttons in the client with `useCan()`.
+
+**Logo:** admins upload a PNG, JPG or WebP (under 1 MB) under **Settings**. It is stored in the database (`branding` table) and shows in the top bar and on the sign-in page. SVG is not accepted because it can contain scripts.
+
 ## Helpers who change the app with Claude
 
 Non-technical helpers can improve the app by talking to Claude on their own laptop. They work on

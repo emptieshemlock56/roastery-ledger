@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { audit } from '../audit.js';
+import { assertCan } from '../auth.js';
 import { HttpError, number, oneOf, text, uuid } from '../http.js';
 import { createMovement, previewMovement } from '../inventory.js';
 import { KINDS } from '../rules.js';
@@ -57,6 +58,8 @@ export default function movementsRouter({ db, events }) {
   });
 
   router.post('/', async (req, res) => {
+    // Each kind of entry has its own permission (roast, pack, ship ...).
+    if (KINDS.includes(req.body?.kind)) assertCan(req.user, req.body.kind);
     const result = await db.tx((t) => createMovement(t, req.user, req.body ?? {}));
     events.emit('movements', req.user);
     const { rows } = await db.query(`${SELECT_MOVEMENTS} WHERE m.id = $1`, [result.id]);
@@ -67,9 +70,11 @@ export default function movementsRouter({ db, events }) {
   router.post('/:id/void', async (req, res) => {
     const id = uuid(req.params.id, 'id');
     const reason = text(req.body?.reason, 'reason', { required: true, max: 500 });
+    assertCan(req.user, 'void');
     await db.tx(async (t) => {
-      const { rows } = await t.query('SELECT voided_at FROM movements WHERE id = $1 FOR UPDATE', [id]);
+      const { rows } = await t.query('SELECT voided_at, kind FROM movements WHERE id = $1 FOR UPDATE', [id]);
       if (!rows[0]) throw new HttpError(404, 'Entry not found');
+      assertCan(req.user, rows[0].kind); // you can only void kinds of entry you could have recorded
       if (rows[0].voided_at) throw new HttpError(409, 'Already voided');
       await t.query('UPDATE movements SET voided_at = NOW(), voided_by = $2, void_reason = $3 WHERE id = $1', [
         id,

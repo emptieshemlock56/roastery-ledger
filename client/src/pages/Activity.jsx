@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
-import { fmtDateTime, fmtQty, Grid, KIND_LABELS, linesSummary, Notice, toDateInput, useData, useDialog } from '../lib.jsx';
+import { fmtDateTime, fmtQty, Grid, KIND_LABELS, linesSummary, Notice, toDateInput, useCan, useData, useDialog } from '../lib.jsx';
 
 export default function Activity() {
+  const can = useCan();
   const grid = useRef();
   const [from, setFrom] = useState(toDateInput(new Date(Date.now() - 13 * 86400000)));
   const [to, setTo] = useState(toDateInput());
@@ -138,7 +139,7 @@ export default function Activity() {
           <p className="muted small">
             Entered by {selected.created_by_name || 'system'} on {fmtDateTime(selected.created_at)}
           </p>
-          {!selected.voided_at && (
+          {!selected.voided_at && can('void') && can(selected.kind) && (
             <button className="danger" onClick={voidEntry}>
               Void this entry
             </button>
