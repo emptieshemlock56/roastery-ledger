@@ -62,9 +62,10 @@ label.inline { flex-direction: row; align-items: center; gap: 6px; }
 .topbar {
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 0 20px;
-  height: 52px;
+  gap: 6px 24px;
+  flex-wrap: wrap; /* more pages now (Settings), so on a narrow window the menu drops to a second line */
+  padding: 6px 20px;
+  min-height: 52px;
   background: #2a211b;
   color: #f4ece4;
 }
@@ -224,3 +225,25 @@ table.mini th, table.mini td { padding: 5px 6px; border-bottom: 1px solid var(--
 .dialog-message { white-space: pre-line; line-height: 1.45; }
 button.primary.danger { background: #a3352b; border-color: #a3352b; color: #fff; }
 button.primary.danger:hover { background: #87281f; }
+
+/* ---- roles and logo ---- */
+.brand-logo { height: 26px; max-width: 160px; object-fit: contain; vertical-align: middle; margin-right: 8px; background: #fff; border-radius: 4px; padding: 2px 6px; }
+.brand-logo.plain { background: none; padding: 0; height: 40px; max-width: 240px; }
+.login h1 .brand-logo { height: 44px; max-width: 260px; background: none; padding: 0; display: block; margin: 0 0 8px; }
+.roles-scroll { overflow-x: auto; margin: 12px 0; border: 1px solid var(--line, #e3d9ce); border-radius: 8px; }
+.roles-grid { border-collapse: collapse; width: 100%; min-width: 640px; }
+.roles-grid th, .roles-grid td { padding: 8px 12px; border-bottom: 1px solid var(--line, #e3d9ce); vertical-align: top; text-align: left; }
+.roles-grid .perm-col { min-width: 220px; font-weight: 500; }
+.roles-grid .role-col { min-width: 170px; font-weight: 400; }
+.roles-grid .tick { text-align: center; }
+.roles-grid .admin-col { background: rgba(138, 75, 32, 0.06); }
+.roles-grid .group-row th { background: #f5efe8; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #6b5a4c; padding: 6px 12px; }
+.roles-grid input[type="checkbox"] { width: 18px; height: 18px; }
+.roles-grid .role-name { font-weight: 600; width: 100%; margin-bottom: 4px; }
+.roles-grid .role-desc { width: 100%; font-size: 12px; margin-bottom: 4px; }
+.logo-card { max-width: 640px; }
+.logo-previews { display: flex; flex-wrap: wrap; gap: 12px; }
+.logo-preview { flex: 1 1 220px; min-width: 0; padding: 14px; border-radius: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.logo-preview .small { flex-basis: 100%; }
+.logo-preview.bar { background: #2b211b; color: #fff; font-weight: 700; }
+.logo-preview.page { background: #fff; border: 1px solid #e3d9ce; }

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
-import { fmtDateTime, fmtQty, Grid, KIND_LABELS, linesSummary, Notice, TYPE_LABELS, TYPES, useData } from '../lib.jsx';
+import { fmtDateTime, fmtQty, Grid, KIND_LABELS, linesSummary, Notice, TYPE_LABELS, TYPES, useCan, useData } from '../lib.jsx';
 
 function status(row) {
   if (row.on_hand < 0) return 'Negative';
@@ -9,6 +9,7 @@ function status(row) {
 }
 
 export default function Stock() {
+  const canCount = useCan()('adjust');
   const { data, error } = useData('/stock');
   const grid = useRef();
   const [type, setType] = useState('all');
@@ -95,9 +96,11 @@ export default function Stock() {
               </button>
             </>
           ) : (
-            <button onClick={() => setCounting(true)} title="Enter physical counts; differences are recorded as adjustments">
-              Stock count
-            </button>
+            canCount && (
+              <button onClick={() => setCounting(true)} title="Enter physical counts; differences are recorded as adjustments">
+                Stock count
+              </button>
+            )
           )}
           <button onClick={() => grid.current?.api.exportDataAsCsv({ fileName: `stock-${new Date().toISOString().slice(0, 10)}.csv` })}>
             Export CSV

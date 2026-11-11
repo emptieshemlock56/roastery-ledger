@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { audit } from '../audit.js';
+import { requireWritePermission } from '../auth.js';
 import { bool, HttpError, oneOf, text, uuid } from '../http.js';
 
 const KINDS = ['roaster', 'packer', 'other'];
 
 export default function machinesRouter({ db, events }) {
   const router = Router();
+  router.use(requireWritePermission('catalog'));
 
   router.get('/', async (_req, res) => {
     const { rows } = await db.query('SELECT id, name, kind, notes, active FROM machines ORDER BY kind, name');

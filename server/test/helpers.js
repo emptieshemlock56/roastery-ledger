@@ -21,6 +21,10 @@ export async function startTestApp(overrides = {}, { mailer } = {}) {
        ('member@example.test', 'Member', $1, 'member')`,
     [hash],
   );
+  // The everyday test member is a "Staff (full access)" person, like members were before roles existed.
+  await db.query(
+    "UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'Staff (full access)') WHERE email = 'member@example.test'",
+  );
 
   const { app, events } = createApp({ db, config, ...(mailer ? { mailer } : {}) });
   const server = await new Promise((resolve) => {

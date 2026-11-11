@@ -1,22 +1,58 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
-import { fmtDateTime, Grid, Notice, useData, useDialog, useUser } from '../lib.jsx';
+import { fmtDateTime, Grid, Notice, Tabs, useData, useDialog, useUser } from '../lib.jsx';
+import Roles from './Roles.jsx';
 
 export default function Users() {
+  const [tab, setTab] = useState('people');
+  return (
+    <section>
+      <div className="toolbar">
+        <h2>Users</h2>
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          options={[
+            ['people', 'People'],
+            ['roles', 'Roles'],
+          ]}
+        />
+      </div>
+      {tab === 'people' ? <People /> : <Roles />}
+    </section>
+  );
+}
+
+function People() {
   const me = useUser();
   const [dialog, ask] = useDialog();
   const users = useData('/users');
+  const roles = useData('/roles');
   const help = useData('/users/help-requests');
   const audit = useData('/audit');
-  const [draft, setDraft] = useState({ name: '', email: '', password: '', role: 'member' });
+  const [draft, setDraft] = useState({ name: '', email: '', password: '', access: '' });
   const [notice, setNotice] = useState(null);
+
+  // One dropdown: Administrator, or one of the roles an admin set up under Roles.
+  const roleList = roles.data?.roles ?? [];
+  const viewOnly = roleList.find((r) => r.name === 'View only') ?? roleList[0];
+  const accessOf = (u) => (u.role === 'admin' ? 'admin' : u.role_id);
+  const bodyFor = (access) => (access === 'admin' ? { role: 'admin' } : { role: 'member', role_id: access });
+  const accessLabels = Object.fromEntries([['admin', 'Administrator'], ...roleList.map((r) => [r.id, r.name])]);
+  const labels = useRef(accessLabels); // read when a cell is drawn, so it is right even if the roles arrive after the people
+  labels.current = accessLabels;
+  const rows = useMemo(
+    () => (users.data || []).map((u) => ({ ...u, access: accessOf(u), access_label: u.role === 'admin' ? 'Administrator' : u.role_name })),
+    [users.data],
+  );
 
   async function add(e) {
     e.preventDefault();
     try {
-      await api('/users', { method: 'POST', body: draft });
+      const { name, email, password } = draft;
+      await api('/users', { method: 'POST', body: { name, email, password, ...bodyFor(draft.access || viewOnly?.id) } });
       setNotice({ kind: 'success', text: `Created ${draft.email}. Share the password with them privately; they can change it under Account.` });
-      setDraft({ name: '', email: '', password: '', role: 'member' });
+      setDraft({ name: '', email: '', password: '', access: '' });
       users.reload();
     } catch (err) {
       setNotice({ kind: 'error', text: err.message });
@@ -75,7 +111,15 @@ export default function Users() {
     () => [
       { field: 'name', flex: 1, editable: true },
       { field: 'email', flex: 1 },
-      { field: 'role', width: 120, editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['member', 'admin'] } },
+      {
+        field: 'access',
+        headerName: 'Role',
+        width: 190,
+        editable: true,
+        cellEditor: 'agSelectCellEditor',
+        cellEditorParams: { values: ['admin', ...roleList.map((r) => r.id)] },
+        valueFormatter: (p) => labels.current[p.value] ?? p.data?.access_label ?? 'No role',
+      },
       { field: 'active', width: 100, editable: true, cellDataType: 'boolean' },
       {
         field: 'two_factor',
@@ -103,7 +147,7 @@ export default function Users() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [roles.data],
   );
 
   const auditCols = useMemo(
@@ -118,12 +162,11 @@ export default function Users() {
   );
 
   return (
-    <section>
+    <>
       {dialog}
-      <h2>Users</h2>
       <p className="muted small">
-        Admins can manage users. Everyone else can record and edit inventory data. Nobody can change how the app works from here: that
-        only happens through a reviewed code change.
+        Administrators manage people, roles and the logo. Everyone else can look at everything and change only what their role allows
+        (see the Roles tab). Nobody can change how the app works from here: that only happens through a reviewed code change.
       </p>
       <HelpRequests
         rows={help.data || []}
@@ -145,9 +188,13 @@ export default function Users() {
           onChange={(e) => setDraft({ ...draft, password: e.target.value })}
           required
         />
-        <select value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value })}>
-          <option value="member">Member</option>
-          <option value="admin">Admin</option>
+        <select value={draft.access || viewOnly?.id || ''} onChange={(e) => setDraft({ ...draft, access: e.target.value })} aria-label="Role">
+          {roleList.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+          <option value="admin">Administrator</option>
         </select>
         <button className="primary">Add user</button>
       </form>
@@ -155,14 +202,17 @@ export default function Users() {
         {notice?.text}
       </Notice>
       <Grid
-        rowData={users.data || []}
+        rowData={rows}
         columnDefs={userCols}
         height="260px"
-        onCellValueChanged={(e) => e.newValue !== e.oldValue && update(e.data.id, { [e.colDef.field]: e.newValue })}
+        onCellValueChanged={(e) => {
+          if (e.newValue === e.oldValue) return;
+          update(e.data.id, e.colDef.field === 'access' ? bodyFor(e.newValue) : { [e.colDef.field]: e.newValue });
+        }}
       />
       <h3>Audit log</h3>
       <Grid rowData={audit.data || []} columnDefs={auditCols} height="360px" />
-    </section>
+    </>
   );
 }
 

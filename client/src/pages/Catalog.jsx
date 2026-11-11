@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
-import { fmtQty, Grid, ItemSelect, Notice, Tabs, TYPE_LABELS, TYPES, useData } from '../lib.jsx';
+import { fmtQty, Grid, ItemSelect, Notice, Tabs, TYPE_LABELS, TYPES, useCan, useData } from '../lib.jsx';
 
 export default function Catalog() {
+  const canEdit = useCan()('catalog');
   const [tab, setTab] = useState('items');
   return (
     <section>
@@ -18,9 +19,10 @@ export default function Catalog() {
           ]}
         />
       </div>
-      {tab === 'items' && <Items />}
-      {tab === 'recipes' && <Recipes />}
-      {tab === 'machines' && <Machines />}
+      {!canEdit && <p className="muted small">Your role can look at the catalog but not change it. Ask an admin if something needs fixing.</p>}
+      {tab === 'items' && <Items canEdit={canEdit} />}
+      {tab === 'recipes' && <Recipes canEdit={canEdit} />}
+      {tab === 'machines' && <Machines canEdit={canEdit} />}
     </section>
   );
 }
@@ -42,7 +44,7 @@ function saveCell(path, setNotice) {
   };
 }
 
-function Items() {
+function Items({ canEdit }) {
   const { data, error } = useData('/items');
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState(null);
@@ -69,8 +71,8 @@ function Items() {
       { field: 'sage_item_code', headerName: 'Sage code', width: 120, editable: true },
       { field: 'notes', flex: 1, minWidth: 160, editable: true },
       { field: 'active', width: 90, editable: true, cellDataType: 'boolean' },
-    ],
-    [],
+    ].map((c) => (canEdit ? c : { ...c, editable: false })),
+    [canEdit],
   );
 
   async function add(e) {
@@ -86,6 +88,7 @@ function Items() {
 
   return (
     <>
+      {canEdit && (
       <form className="toolbar card tight" onSubmit={add}>
         <b>New item</b>
         <input placeholder="Code (e.g. GRN-BRA-CER)" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} required />
@@ -102,14 +105,15 @@ function Items() {
             <option key={u}>{u}</option>
           ))}
         </select>
-        <button className="primary">Add</button>
+ <button className="primary">Add</button>
       </form>
+      )}
       <div className="toolbar">
         <input type="search" placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} />
         <label className="inline">
           <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> Show inactive
         </label>
-        <span className="muted small">Click a cell to edit; changes save immediately. Retire items by unticking “active”.</span>
+        {canEdit && <span className="muted small">Click a cell to edit; changes save immediately. Retire items by unticking “active”.</span>}
       </div>
       <Notice kind={notice?.kind} onClose={() => setNotice(null)}>
         {notice?.text}
@@ -132,7 +136,7 @@ const RECIPE_HINTS = {
   finished: 'What one packed unit uses: lb of coffee (e.g. 0.75 for 12 oz), 1 bag, 1 label, 1/12 case…',
 };
 
-function Recipes() {
+function Recipes({ canEdit }) {
   const { data: items } = useData('/items');
   const [parentId, setParentId] = useState(null);
   const [rows, setRows] = useState([]);
@@ -202,6 +206,7 @@ function Recipes() {
                     items={items}
                     types={TYPES.filter((t) => t !== 'finished')}
                     value={r.component_item_id}
+                    disabled={!canEdit}
                     onChange={(v) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, component_item_id: v } : x)))}
                   />
                   <input
@@ -210,17 +215,22 @@ function Recipes() {
                     min="0"
                     value={r.qty_per_unit}
                     placeholder="Qty"
+                    disabled={!canEdit}
                     onChange={(e) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, qty_per_unit: e.target.value } : x)))}
                   />
                   <span className="muted small">{it?.unit}</span>
-                  <button className="link" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} aria-label="Remove">
-                    ✕
-                  </button>
+                  {canEdit && (
+                    <button className="link" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} aria-label="Remove">
+                      ✕
+                    </button>
+                  )}
                 </div>
               );
             })}
             <div className="row">
-              <button onClick={() => setRows((rs) => [...rs, { key: crypto.randomUUID(), component_item_id: null, qty_per_unit: '' }])}>+ Add component</button>
+              {canEdit && (
+                <button onClick={() => setRows((rs) => [...rs, { key: crypto.randomUUID(), component_item_id: null, qty_per_unit: '' }])}>+ Add component</button>
+              )}
               {parent.type === 'blend' && (
                 <span className={Math.abs(total - 1) > 0.001 ? 'neg small' : 'muted small'}>Total: {fmtQty(total, 3)} lb per lb</span>
               )}
@@ -230,9 +240,11 @@ function Recipes() {
                 </span>
               )}
               <div className="spacer" />
-              <button className="primary" onClick={save}>
-                Save recipe
-              </button>
+              {canEdit && (
+                <button className="primary" onClick={save}>
+                  Save recipe
+                </button>
+              )}
             </div>
             <Notice kind={notice?.kind} onClose={() => setNotice(null)}>
               {notice?.text}
@@ -244,7 +256,7 @@ function Recipes() {
   );
 }
 
-function Machines() {
+function Machines({ canEdit }) {
   const { data, error } = useData('/machines');
   const [notice, setNotice] = useState(null);
   const [draft, setDraft] = useState({ name: '', kind: 'packer' });
@@ -254,8 +266,8 @@ function Machines() {
       { field: 'kind', width: 140, editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['roaster', 'packer', 'other'] } },
       { field: 'notes', flex: 2, editable: true },
       { field: 'active', width: 100, editable: true, cellDataType: 'boolean' },
-    ],
-    [],
+    ].map((c) => (canEdit ? c : { ...c, editable: false })),
+    [canEdit],
   );
   async function add(e) {
     e.preventDefault();
@@ -268,6 +280,7 @@ function Machines() {
   }
   return (
     <>
+      {canEdit && (
       <form className="toolbar card tight" onSubmit={add}>
         <b>New machine</b>
         <input placeholder="Name (e.g. Packer C)" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
@@ -278,6 +291,7 @@ function Machines() {
         </select>
         <button className="primary">Add</button>
       </form>
+      )}
       <Notice kind={notice?.kind} onClose={() => setNotice(null)}>
         {notice?.text}
       </Notice>

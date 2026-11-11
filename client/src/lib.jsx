@@ -10,6 +10,21 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 export const LiveContext = createContext({ tick: 0 });
 export const UserContext = createContext(null);
 export const useUser = () => useContext(UserContext);
+/** `can('ship')`: does this person's role allow it? (Everyone can always look; this is only about changing things.) */
+export function useCan() {
+  const user = useUser();
+  return (permission) => Boolean(user?.permissions?.includes(permission));
+}
+
+/** The company logo if one was uploaded, otherwise the coffee cup. `logo` is the version number from /api/config. */
+export function Brand({ logo }) {
+  return (
+    <>
+      {logo ? <img className="brand-logo" src={`/api/branding/logo?v=${logo}`} alt="" /> : '☕ '}
+      Roastery Ledger
+    </>
+  );
+}
 
 export function useData(path) {
   const { tick } = useContext(LiveContext);

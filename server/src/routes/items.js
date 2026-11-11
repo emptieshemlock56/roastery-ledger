@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { audit } from '../audit.js';
+import { requireWritePermission } from '../auth.js';
 import { badRequest, bool, HttpError, number, oneOf, text, uuid } from '../http.js';
 import { ITEM_TYPES } from '../rules.js';
 
@@ -51,6 +52,7 @@ export async function updateItem(q, id, fields) {
 
 export default function itemsRouter({ db, events }) {
   const router = Router();
+  router.use(requireWritePermission('catalog'));
 
   router.get('/', async (_req, res) => {
     const { rows } = await db.query(`${SELECT_ITEMS} ORDER BY i.type, i.name`);

@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import QRCode from 'qrcode';
 import { audit } from './audit.js';
 import { HttpError, text } from './http.js';
+import { PERMISSION_KEYS, permissionLabel } from './permissions.js';
 import { hashBackupCode, matchStep, newBackupCodes, newSecret, normalizeCode, otpauthUrl } from './totp.js';
 
 export const SESSION_COOKIE = 'ledger_session';
@@ -27,16 +28,27 @@ export function checkPasswordStrength(pw) {
   return pw;
 }
 
-const USER_COLS = 'id, email, name, role, active, session_version, totp_enabled_at';
+const USER_COLS = 'id, email, name, role, role_id, active, session_version, totp_enabled_at';
+
+/** What a person may change: admins everything, members whatever their role lists (no role = view only). */
+export async function permissionsFor(db, u) {
+  if (u.role === 'admin') return [...PERMISSION_KEYS];
+  if (!u.role_id) return [];
+  const { rows } = await db.query('SELECT permissions FROM roles WHERE id = $1', [u.role_id]);
+  return rows[0]?.permissions ?? [];
+}
 
 /** What the browser is told about the signed-in user. */
-export function publicUser(u, config) {
+export async function publicUser(db, u, config) {
   const twoFactor = Boolean(u.totp_enabled_at);
+  const roleName = u.role === 'admin' ? 'Administrator' : (await db.query('SELECT name FROM roles WHERE id = $1', [u.role_id])).rows[0]?.name ?? 'No role';
   return {
     id: u.id,
     email: u.email,
     name: u.name,
     role: u.role,
+    role_name: roleName,
+    permissions: await permissionsFor(db, u),
     two_factor: twoFactor,
     two_factor_required: config.require2fa,
     must_setup_2fa: config.require2fa && !twoFactor,
@@ -81,7 +93,14 @@ export function requireAuth({ db, config }) {
     const u = rows[0];
     if (!u) throw new HttpError(401, 'Account is disabled');
     if (u.session_version !== payload.sv) throw new HttpError(401, 'You were signed out. Please sign in again.');
-    req.user = { id: u.id, email: u.email, name: u.name, role: u.role, two_factor: Boolean(u.totp_enabled_at) };
+    req.user = {
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      role: u.role,
+      two_factor: Boolean(u.totp_enabled_at),
+      permissions: await permissionsFor(db, u),
+    };
     next();
   };
 }
@@ -98,6 +117,24 @@ export function requireAdmin(req, _res, next) {
   if (req.user?.role !== 'admin') throw new HttpError(403, 'Only admins can do that');
   next();
 }
+
+export const can = (user, permission) => Boolean(user?.permissions?.includes(permission));
+
+/** Throws unless the signed-in person's role allows `permission`. */
+export function assertCan(user, permission) {
+  if (!can(user, permission)) {
+    throw new HttpError(403, `Your role isn't allowed to do that (${permissionLabel(permission)}). Ask an admin if you need it.`);
+  }
+}
+
+export const requirePermission = (permission) => (req, _res, next) => {
+  assertCan(req.user, permission);
+  next();
+};
+
+/** Looking is open to everyone signed in; only changes (POST/PUT/PATCH/DELETE) need the permission. */
+export const requireWritePermission = (permission) => (req, res, next) =>
+  ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ? next() : requirePermission(permission)(req, res, next);
 
 // Blocks cross-site form posts: browsers can't add custom headers cross-origin
 // without a CORS preflight, which this server never approves.
@@ -193,7 +230,7 @@ export function authRouter(ctx) {
     }
     issueSession(res, user, config);
     await audit(db, user, 'login', 'user', user.id);
-    res.json({ user: publicUser(user, config) });
+    res.json({ user: await publicUser(db, user, config) });
   });
 
   // Step 2: the 6-digit authenticator code, or a backup code.
@@ -230,7 +267,7 @@ export function authRouter(ctx) {
       details.backup_codes_left = left.rows[0].n;
     }
     await audit(db, user, 'login', 'user', user.id, details);
-    res.json({ user: publicUser(user, config), backup_codes_left: details.backup_codes_left });
+    res.json({ user: await publicUser(db, user, config), backup_codes_left: details.backup_codes_left });
   });
 
   router.post('/logout', (_req, res) => {
@@ -241,7 +278,7 @@ export function authRouter(ctx) {
   const authed = requireAuth(ctx);
   const loadUser = async (id) => (await db.query(`SELECT ${USER_COLS} FROM users WHERE id = $1`, [id])).rows[0];
 
-  router.get('/me', authed, async (req, res) => res.json({ user: publicUser(await loadUser(req.user.id), config) }));
+  router.get('/me', authed, async (req, res) => res.json({ user: await publicUser(db, await loadUser(req.user.id), config) }));
 
   // Changing your password signs you out everywhere else; this browser stays signed in.
   router.post('/password', authed, async (req, res) => {
@@ -289,7 +326,7 @@ export function authRouter(ctx) {
       return replaceBackupCodes(t, req.user.id);
     });
     await audit(db, req.user, 'enable_2fa', 'user', req.user.id);
-    res.json({ backup_codes: codes, user: publicUser(await loadUser(req.user.id), config) });
+    res.json({ backup_codes: codes, user: await publicUser(db, await loadUser(req.user.id), config) });
   });
 
   // New backup codes (the old ones stop working). Needs a current authenticator code.

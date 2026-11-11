@@ -6,12 +6,14 @@ import { authRouter, requireAppHeader, requireAuth, requireTwoFactorReady } from
 import { createEventHub } from './events.js';
 import { errorHandler } from './http.js';
 import { createMailer } from './mailer.js';
+import brandingRouter, { logoImageRouter, logoVersion } from './routes/branding.js';
 import { helpRequestRouter } from './routes/help.js';
 import importRouter from './routes/import.js';
 import itemsRouter from './routes/items.js';
 import machinesRouter from './routes/machines.js';
 import movementsRouter from './routes/movements.js';
 import reportsRouter from './routes/reports.js';
+import rolesRouter from './routes/roles.js';
 import sampleRouter from './routes/sample.js';
 import stockRouter from './routes/stock.js';
 import usersRouter, { auditRouter } from './routes/users.js';
@@ -39,7 +41,12 @@ export function createApp({ db, config, mailer = createMailer(config) }) {
   });
 
   app.use('/api', requireAppHeader);
-  app.get('/api/config', (_req, res) => res.json({ env: config.appEnv, version: config.version }));
+  app.get('/api/config', async (_req, res) => {
+    // `logo` is when the picture last changed (or null), so browsers know to show it and when to refetch it.
+    const logo = await logoVersion(db).catch(() => null);
+    res.json({ env: config.appEnv, version: config.version, logo });
+  });
+  app.use('/api/branding', logoImageRouter(ctx));
   app.use('/api/auth/help', helpRequestRouter(ctx));
   app.use('/api/auth', authRouter(ctx));
 
@@ -53,6 +60,8 @@ export function createApp({ db, config, mailer = createMailer(config) }) {
   app.use('/api/reports', reportsRouter(ctx));
   app.use('/api/import', importRouter(ctx));
   app.use('/api/sample-data', sampleRouter(ctx));
+  app.use('/api/branding', brandingRouter(ctx));
+  app.use('/api/roles', rolesRouter(ctx));
   app.use('/api/users', usersRouter(ctx));
   app.use('/api/audit', auditRouter(ctx));
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));

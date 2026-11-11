@@ -24,6 +24,9 @@ export async function seedDev(db, config) {
       [hash],
     );
     const user = users[0];
+    await t.query(
+      "UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'Staff (full access)') WHERE email = 'floor@example.test'",
+    );
 
     const ids = {};
     const item = async (key, fields) => (ids[key] = await insertItem(t, fields));

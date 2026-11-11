@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
-import { LiveContext, UserContext } from './lib.jsx';
+import { Brand, LiveContext, UserContext } from './lib.jsx';
 import Account from './pages/Account.jsx';
 import Activity from './pages/Activity.jsx';
 import Catalog from './pages/Catalog.jsx';
@@ -8,6 +8,7 @@ import Import from './pages/Import.jsx';
 import Login from './pages/Login.jsx';
 import Record from './pages/Record.jsx';
 import Reports from './pages/Reports.jsx';
+import Settings from './pages/Settings.jsx';
 import Stock from './pages/Stock.jsx';
 import TwoFactorSetup from './pages/TwoFactorSetup.jsx';
 import Users from './pages/Users.jsx';
@@ -18,8 +19,9 @@ const PAGES = {
   activity: ['Activity', Activity],
   reports: ['Reports', Reports],
   catalog: ['Catalog', Catalog],
-  import: ['Import', Import],
+  import: ['Import', Import, undefined, 'import'], // 4th item: the permission needed to open it
   users: ['Users', Users, 'admin'],
+  settings: ['Settings', Settings, 'admin'],
   account: ['Account', Account, 'hidden'],
 };
 
@@ -47,12 +49,20 @@ export default function App() {
   const [lastChange, setLastChange] = useState(null);
   const page = usePage();
 
+  const loadConfig = () => api('/config').then(setConfig, () => setConfig((c) => c ?? { env: 'unknown' }));
+  // Keep the same object when nothing changed, so a refresh doesn't restart the live connection.
+  const refreshMe = () => api('/auth/me').then((d) => setUser((prev) => (prev && JSON.stringify(prev) === JSON.stringify(d.user) ? prev : d.user)), () => {});
+
   useEffect(() => {
-    api('/config').then(setConfig, () => setConfig({ env: 'unknown' }));
+    loadConfig();
     api('/auth/me').then((d) => setUser(d.user), () => setUser(null));
     const out = () => setUser(null);
     window.addEventListener('ledger:signed-out', out);
-    return () => window.removeEventListener('ledger:signed-out', out);
+    window.addEventListener('ledger:branding', loadConfig);
+    return () => {
+      window.removeEventListener('ledger:signed-out', out);
+      window.removeEventListener('ledger:branding', loadConfig);
+    };
   }, []);
 
   // Live updates from other users.
@@ -63,6 +73,8 @@ export default function App() {
       setTick((t) => t + 1);
       try {
         const msg = JSON.parse(e.data);
+        if (msg.entity === 'branding') loadConfig();
+        if (msg.entity === 'roles' || msg.entity === 'users') refreshMe(); // someone's access may have changed
         if (msg.by && msg.by !== user.name) setLastChange(`${msg.by} updated ${msg.entity}`);
       } catch {
         /* ignore */
@@ -100,7 +112,7 @@ export default function App() {
   if (!user) return (
     <>
       {banner}
-      <Login onSignedIn={signedIn} />
+      <Login onSignedIn={signedIn} logo={config?.logo} />
     </>
   );
 
@@ -124,7 +136,8 @@ export default function App() {
     </>
   );
 
-  const allowed = PAGES[page] && (PAGES[page][2] !== 'admin' || user.role === 'admin');
+  const canOpen = ([, , access, permission]) => (access !== 'admin' || user.role === 'admin') && (!permission || user.permissions.includes(permission));
+  const allowed = PAGES[page] && canOpen(PAGES[page]);
   const Page = (allowed ? PAGES[page] : PAGES.stock)[1];
 
   return (
@@ -132,10 +145,12 @@ export default function App() {
       <LiveContext.Provider value={{ tick }}>
         {banner}
         <header className="topbar">
-          <div className="brand">☕ Roastery Ledger</div>
+          <div className="brand">
+            <Brand logo={config?.logo} />
+          </div>
           <nav>
             {Object.entries(PAGES)
-              .filter(([, [, , a]]) => a !== 'hidden' && (a !== 'admin' || user.role === 'admin'))
+              .filter(([, entry]) => entry[2] !== 'hidden' && canOpen(entry))
               .map(([key, [label]]) => (
                 <a key={key} href={`#/${key}`} className={page === key ? 'active' : ''}>
                   {label}
